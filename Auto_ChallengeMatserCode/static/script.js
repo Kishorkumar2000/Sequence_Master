@@ -1,15 +1,223 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const card = document.querySelector('.game-card');
-    const seqDisplay = document.querySelector('sequence-display');
-    const answerFormEl = document.querySelector('answer-form');
-    const feedbackEl = document.querySelector('feedback-message');
+    // Debug logging
+    console.log('Script loaded');
+
+    const card = document.getElementById('game-card');
+    const seqDisplay = document.getElementById('sequence');
+    const answerFormEl = document.getElementById('answer-form');
+    const feedbackEl = document.getElementById('feedback-message');
     const hintIframe = document.getElementById('hint-iframe');
     const scoreboardIframe = document.getElementById('scoreboard-iframe');
-    const timerBar = document.querySelector('timer-bar');
+    const timerBar = document.getElementById('timer-bar-fill');
     let gameOver = false;
     let timerDuration = 20; // seconds
     let timerInterval = null;
     let timerLeft = timerDuration;
+    let selectedMode = null;
+    let username = localStorage.getItem('username');
+
+    // DOM Elements
+    const modeCards = document.querySelectorAll('.mode-card');
+    const playBtn = document.getElementById('play-btn');
+    const settingsBtn = document.getElementById('settings-btn');
+    const tutorialBtn = document.getElementById('tutorial-btn');
+    const startScreen = document.getElementById('start-screen');
+    const usernameModal = document.getElementById('username-modal');
+
+    console.log('Found mode cards:', modeCards.length);
+
+    // Debug: Log all mode cards
+    modeCards.forEach(card => {
+        console.log('Mode card found:', {
+            mode: card.dataset.mode,
+            text: card.querySelector('h3').textContent
+        });
+
+        // Add click handler directly to each card
+        card.onclick = function(event) {
+            console.log('Mode card clicked:', card.dataset.mode);
+            
+            // Remove active class from all cards
+            modeCards.forEach(c => c.classList.remove('active'));
+            
+            // Add active class to clicked card
+            card.classList.add('active');
+            
+            // Update selected mode and play button
+            selectedMode = card.dataset.mode;
+            playBtn.disabled = false;
+            playBtn.textContent = `Play ${selectedMode.charAt(0).toUpperCase() + selectedMode.slice(1)} Mode`;
+            
+            console.log('Mode selected:', selectedMode);
+        };
+
+        // Add keyboard support
+        card.onkeydown = function(event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                card.click();
+            }
+        };
+    });
+
+    // Add back to menu button to game card
+    const backBtn = document.createElement('button');
+    backBtn.textContent = 'Back to Menu';
+    backBtn.className = 'secondary-btn';
+    backBtn.style.marginTop = '1rem';
+    backBtn.onclick = function() {
+        card.style.display = 'none';
+        startScreen.style.display = 'flex';
+        stopTimer();
+        showScoreHistory();
+        updateStatsDisplay();
+    };
+    card.appendChild(backBtn);
+
+    // Initialize scores in localStorage if not present
+    if (!localStorage.getItem('scoreHistory')) {
+        localStorage.setItem('scoreHistory', JSON.stringify([]));
+    }
+    if (!localStorage.getItem('modeStats')) {
+        localStorage.setItem('modeStats', JSON.stringify({}));
+    }
+
+    function showUsernameModal(callback) {
+        usernameModal.style.display = 'flex';
+        const submitBtn = document.getElementById('username-submit');
+        const input = document.getElementById('username-input');
+
+        submitBtn.onclick = function() {
+            let name = input.value.trim();
+            if (!name) {
+                // Generate a fun nickname
+                const animals = ['Tiger', 'Panda', 'Falcon', 'Otter', 'Wolf', 'Koala', 'Eagle', 'Lion', 'Bear', 'Fox'];
+                const colors = ['Blue', 'Red', 'Green', 'Yellow', 'Purple', 'Orange', 'Silver', 'Gold', 'Aqua', 'Indigo'];
+                name = colors[Math.floor(Math.random() * colors.length)] + 
+                       animals[Math.floor(Math.random() * animals.length)] + 
+                       Math.floor(Math.random() * 100);
+            }
+            localStorage.setItem('username', name);
+            username = name;
+            usernameModal.style.display = 'none';
+            if (callback) callback();
+        };
+    }
+
+    function updateScoreHistory() {
+        const scoresList = document.getElementById('recent-scores-list');
+        const scores = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
+        
+        scoresList.innerHTML = scores.slice(0, 5).map(score => `
+            <li>
+                <strong>${score.name}</strong> - ${score.score} points 
+                <span style="color: #78909c">(${score.mode} mode)</span>
+            </li>
+        `).join('');
+    }
+
+    // Update score history on load
+    updateScoreHistory();
+
+    // Play button click handler
+    playBtn.onclick = function() {
+        if (!selectedMode) return;
+
+        const startGame = () => {
+            // Hide start screen and show game
+            startScreen.style.display = 'none';
+            card.style.display = 'block';
+            
+            // Set up game mode
+            fetch('/api/mode', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mode: selectedMode })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Mode set response:', data);
+                if (data.status === 'success') {
+                    loadChallenge();
+                    showScoreHistory();
+                    updateStatsDisplay();
+                }
+            })
+            .catch(error => {
+                console.error('Error setting game mode:', error);
+                alert('Failed to start game. Please try again.');
+            });
+        };
+
+        // Check for username before starting
+        if (!username) {
+            showUsernameModal(startGame);
+        } else {
+            startGame();
+        }
+    };
+
+    // Game mode configuration
+    const GAME_MODES = {
+        classic: { timer: 20, multiplier: 1 },
+        speed: { timer: 10, multiplier: 2 },
+        zen: { timer: null, multiplier: 0.5 },
+        daily: { timer: 30, multiplier: 3 }
+    };
+
+    // Achievement configuration
+    const ACHIEVEMENTS = {
+        quickThinker: { name: 'Quick Thinker', description: 'Complete a level in under 5 seconds', icon: '⚡' },
+        perfectionist: { name: 'Perfectionist', description: 'Get 5 correct answers in a row', icon: '🎯' },
+        zenMaster: { name: 'Zen Master', description: 'Score 1000 points in Zen mode', icon: '🧘' },
+        speedDemon: { name: 'Speed Demon', description: 'Score 2000 points in Speed mode', icon: '🏃' },
+        dailyWarrior: { name: 'Daily Warrior', description: 'Complete 5 daily challenges', icon: '📅' },
+        patternMaster: { name: 'Pattern Master', description: 'Solve a level 10 sequence', icon: '🧩' }
+    };
+
+    // Tutorial system
+    let currentTutorialStep = 0;
+    const TUTORIAL_STEPS = [
+        {
+            title: 'Welcome to Sequence Master!',
+            content: 'Learn how to solve sequence puzzles and challenge your logical thinking.',
+            image: null
+        },
+        {
+            title: 'Game Modes',
+            content: 'Choose from Classic (20s), Speed (10s), Zen (no timer), or Daily Challenge modes.',
+            image: null
+        },
+        {
+            title: 'Sequence Patterns',
+            content: 'Each sequence follows a unique pattern. Use the hint to help you solve it!',
+            image: null
+        },
+        {
+            title: 'Time Management',
+            content: 'Most modes have a timer. Answer before time runs out! Watch for the warning when time is low.',
+            image: null
+        },
+        {
+            title: 'Achievements',
+            content: 'Earn achievements and climb the global leaderboard! Try different modes to unlock all achievements.',
+            image: null
+        }
+    ];
+
+    // Sound system
+    const SOUNDS = {};
+
+    function initSounds() {
+        const soundFiles = ['correct', 'wrong', 'warning', 'timeout', 'achievement'];
+        soundFiles.forEach(sound => {
+            const audio = new Audio(`/static/sounds/${sound}.mp3`);
+            audio.onerror = () => console.log(`Failed to load sound: ${sound}`);
+            SOUNDS[sound] = audio;
+        });
+    }
 
     function setHint(hint) {
         if (hintIframe && hintIframe.contentWindow) {
@@ -36,27 +244,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startTimer(onTimeout) {
-        let timeLeft = timerDuration;
+        if (!GAME_MODES[selectedMode].timer) return; // No timer for Zen mode
+        
+        let timeLeft = GAME_MODES[selectedMode].timer;
         const bar = document.getElementById('timer-bar-fill');
         const countdown = document.getElementById('timer-countdown');
+
+        // Reset timer state
         bar.style.width = '100%';
+        bar.style.display = 'block';
+        countdown.style.display = 'block';
         countdown.textContent = timeLeft;
+
         if (timerInterval) clearInterval(timerInterval);
+
         timerInterval = setInterval(() => {
             timeLeft--;
-            bar.style.width = ((timeLeft / timerDuration) * 100) + '%';
+            const percentage = (timeLeft / GAME_MODES[selectedMode].timer) * 100;
+            bar.style.width = percentage + '%';
             countdown.textContent = timeLeft;
+
+            // Add warning colors
+            if (timeLeft <= 5) {
+                bar.style.background = 'linear-gradient(90deg, #ff4081, #ff0000)';
+                countdown.style.color = '#ff4081';
+                playSound('warning');
+            }
+
             if (timeLeft <= 0) {
                 clearInterval(timerInterval);
                 bar.style.width = '0%';
                 countdown.textContent = '0';
+                playSound('timeout');
                 if (typeof onTimeout === 'function') onTimeout();
             }
         }, 1000);
     }
 
     function stopTimer() {
-        if (timerInterval) clearInterval(timerInterval);
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            const bar = document.getElementById('timer-bar-fill');
+            const countdown = document.getElementById('timer-countdown');
+            bar.style.width = '0%';
+            countdown.textContent = '0';
+        }
     }
 
     function confetti() {
@@ -73,28 +305,63 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function loadChallenge() {
+        console.log('Loading challenge...');
         fetch('/api/challenge')
             .then(res => res.json())
             .then(data => {
-                seqDisplay.setLevel(data.level);
-                seqDisplay.setScore(data.score);
-                seqDisplay.setSequence(data.sequence.join(' '));
+                console.log('Challenge data:', data);
+                // Update sequence display
+                seqDisplay.textContent = data.sequence.join(' ');
+                // Update level and score display
+                document.getElementById('level-score').textContent = `Level ${data.level} - Score: ${data.score}`;
                 document.getElementById('hint-message').textContent = data.hint;
                 setScoreboard(data.level, data.score);
                 setFeedback('');
-                answerFormEl.value = '';
-                answerFormEl.disabled = false;
+
+                // Reset and re-enable all game elements
+                const answerInput = document.getElementById('answer-input');
+                const submitBtn = document.getElementById('submit-btn');
+                const quitBtn = document.getElementById('quit-btn');
+                const restartBtn = document.getElementById('restart-btn');
+
+                // Re-enable input and buttons
+                answerInput.disabled = false;
+                answerInput.value = '';
+                submitBtn.disabled = false;
+                quitBtn.disabled = false;
+                restartBtn.style.display = 'none';
+                
+                if (answerFormEl) {
+                    answerFormEl.disabled = false;
+                }
                 gameOver = false;
+                
+                // Update timer based on game mode
+                if (data.mode) {
+                    selectedMode = data.mode;
+                    timerDuration = GAME_MODES[data.mode].timer;
+                }
+                
                 startTimer(() => {
-                    document.getElementById('feedback-message').textContent = '⏰ Time is up! Game Over.';
-                    // Get the score from the UI
-                    let score = 0;
-                    const scoreText = document.getElementById('level-score').textContent;
-                    if (scoreText.match(/Score: (\\d+)/)) {
-                        score = parseInt(scoreText.match(/Score: (\\d+)/)[1]);
-                    }
-                    disableGame(score);
+                    fetch('/api/last_answer')
+                        .then(res => res.json())
+                        .then(data => {
+                            let answerMsg = data.last_answer !== null
+                                ? `⏰ Time is up! Game Over. The correct answer was: <b>${data.last_answer}</b>`
+                                : '⏰ Time is up! Game Over.';
+                            document.getElementById('feedback-message').innerHTML = answerMsg;
+                            let score = 0;
+                            const scoreText = document.getElementById('level-score').textContent;
+                            if (scoreText.match(/Score: (\d+)/)) {
+                                score = parseInt(scoreText.match(/Score: (\d+)/)[1]);
+                            }
+                            disableGame(score);
+                        });
                 });
+            })
+            .catch(error => {
+                console.error('Error loading challenge:', error);
+                showNotification('Error', 'Failed to load challenge. Please try again.');
             });
     }
 
@@ -106,80 +373,206 @@ document.addEventListener('DOMContentLoaded', () => {
         stopTimer();
         gameOver = true;
         if (typeof finalScore === 'number') {
-            saveScore(finalScore);
+            saveScore(finalScore, selectedMode);
             showScoreHistory();
+            checkAchievements(finalScore);
         }
     }
 
-    function getOrSetUsername() {
+    function getOrSetUsername(callback) {
         let username = localStorage.getItem('username');
         if (!username) {
             document.getElementById('username-modal').style.display = 'flex';
-            document.getElementById('username-submit').onclick = function() {
+            document.getElementById('username-submit').onclick = function () {
                 let name = document.getElementById('username-input').value.trim();
                 if (!name) {
                     // Generate a fun nickname
                     const animals = ['Tiger', 'Panda', 'Falcon', 'Otter', 'Wolf', 'Koala', 'Eagle', 'Lion', 'Bear', 'Fox'];
                     const colors = ['Blue', 'Red', 'Green', 'Yellow', 'Purple', 'Orange', 'Silver', 'Gold', 'Aqua', 'Indigo'];
-                    name = colors[Math.floor(Math.random()*colors.length)] + animals[Math.floor(Math.random()*animals.length)] + Math.floor(Math.random()*100);
+                    name = colors[Math.floor(Math.random() * colors.length)] + animals[Math.floor(Math.random() * animals.length)] + Math.floor(Math.random() * 100);
                 }
                 localStorage.setItem('username', name);
                 document.getElementById('username-modal').style.display = 'none';
-                showScoreHistory();
+                if (callback) callback();
             };
             return null;
         }
         return username;
     }
 
-    function saveScore(score) {
-        let username = getOrSetUsername() || localStorage.getItem('username');
+    function saveScore(score, mode = 'classic') {
+        let username = localStorage.getItem('username') || 'Player';
         let scores = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
-        scores.unshift({ name: username, score: score, date: new Date().toLocaleString() });
+        
+        // Add new score to history
+        const newScore = { 
+            name: username, 
+            score: score, 
+            mode: mode,
+            date: new Date().toLocaleString() 
+        };
+        scores.unshift(newScore);
+        
+        // Keep only top 10 scores
         if (scores.length > 10) scores = scores.slice(0, 10);
         localStorage.setItem('scoreHistory', JSON.stringify(scores));
+        
+        // Update mode-specific stats
+        let modeStats = JSON.parse(localStorage.getItem('modeStats') || '{}');
+        
+        // Initialize mode stats if not exists
+        if (!modeStats[mode]) {
+            modeStats[mode] = { bestScore: 0, gamesPlayed: 0 };
+        }
+        
+        // Update best score if current score is higher
+        if (score > modeStats[mode].bestScore) {
+            modeStats[mode].bestScore = score;
+        }
+        
+        // Increment games played
+        modeStats[mode].gamesPlayed++;
+        
+        // Save updated stats
+        localStorage.setItem('modeStats', JSON.stringify(modeStats));
+        
+        // Update displays
+        showScoreHistory();
+        updateStatsDisplay();
     }
 
     function showScoreHistory() {
-        let scores = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
-        let html = '<h3>Recent Scores</h3><ul>';
+        const recentScoresList = document.getElementById('recent-scores-list');
+        const scores = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
+        
+        if (!recentScoresList) return;
+
+        // Update recent scores (show only last 3)
         if (scores.length === 0) {
-            html += '<li>No games played yet.</li>';
+            recentScoresList.innerHTML = '<li>No games played yet.</li>';
         } else {
-            scores.forEach((entry, i) => {
-                html += `<li>${entry.name} — ${entry.score} <span style="color:#888;font-size:0.9em;">(${entry.date})</span></li>`;
-            });
+            recentScoresList.innerHTML = scores.slice(0, 3).map(entry => `
+                <li>
+                    <strong>${entry.name}</strong> - ${entry.score} points 
+                    <span style="color: #78909c">(${entry.mode} mode)</span>
+                    <br>
+                    <small style="color: #78909c">${entry.date}</small>
+                </li>
+            `).join('');
         }
-        html += '</ul>';
-        document.getElementById('score-history').innerHTML = html;
     }
 
-    document.getElementById('answer-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const answer = document.getElementById('answer-input').value.trim();
-        fetch('/api/answer', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({answer})
-        })
-        .then(res => res.json())
-        .then(data => {
-            document.getElementById('feedback-message').textContent = data.message;
-            if (data.game_over) {
-                // Try to extract score from backend response or message
-                let score = 0;
-                if (data.message.match(/Score: (\\d+)/)) {
-                    score = parseInt(data.message.match(/Score: (\\d+)/)[1]);
-                } else if (typeof data.score === 'number') {
-                    score = data.score;
-                }
-                disableGame(score);
-            } else {
-                stopTimer();
-                loadChallenge();
+    function checkAchievements(score) {
+        let achievements = JSON.parse(localStorage.getItem('achievements') || '[]');
+        let newAchievements = [];
+        
+        // Check each achievement condition
+        if (!achievements.includes('quickThinker') && document.getElementById('timer-countdown').textContent > 15) {
+            newAchievements.push('quickThinker');
+        }
+        
+        let stats = JSON.parse(localStorage.getItem('modeStats') || '{}');
+        if (!achievements.includes('zenMaster') && stats.zen?.bestScore >= 1000) {
+            newAchievements.push('zenMaster');
+        }
+        
+        if (!achievements.includes('speedDemon') && stats.speed?.bestScore >= 2000) {
+            newAchievements.push('speedDemon');
+        }
+        
+        // Add new achievements
+        achievements = [...new Set([...achievements, ...newAchievements])];
+        localStorage.setItem('achievements', JSON.stringify(achievements));
+        
+        // Show achievement notifications
+        newAchievements.forEach(achievement => {
+            showNotification(
+                `Achievement Unlocked: ${ACHIEVEMENTS[achievement].name}`,
+                ACHIEVEMENTS[achievement].description,
+                ACHIEVEMENTS[achievement].icon
+            );
+        });
+        
+        updateAchievementDisplay();
+    }
+
+    function updateStatsDisplay() {
+        const stats = JSON.parse(localStorage.getItem('modeStats') || '{}');
+        
+        // Update mode-specific stats
+        Object.keys(GAME_MODES).forEach(mode => {
+            const modeStats = stats[mode] || { bestScore: 0, gamesPlayed: 0 };
+            const bestScoreEl = document.getElementById(`${mode}-best`);
+            const gamesPlayedEl = document.getElementById(`${mode}-games`);
+            
+            if (bestScoreEl) {
+                bestScoreEl.textContent = modeStats.bestScore || 0;
+            }
+            if (gamesPlayedEl) {
+                gamesPlayedEl.textContent = modeStats.gamesPlayed || 0;
             }
         });
-    });
+        
+        // Update total games
+        const totalGamesEl = document.getElementById('total-games');
+        if (totalGamesEl) {
+            const totalGames = Object.values(stats).reduce((sum, mode) => sum + (mode.gamesPlayed || 0), 0);
+            totalGamesEl.textContent = totalGames;
+        }
+    }
+
+    function updateAchievementDisplay() {
+        const achievements = JSON.parse(localStorage.getItem('achievements') || '[]');
+        const container = document.querySelector('.achievement-icons');
+        container.innerHTML = '';
+        
+        Object.keys(ACHIEVEMENTS).forEach(id => {
+            const achievement = ACHIEVEMENTS[id];
+            const div = document.createElement('div');
+            div.className = `achievement-icon ${achievements.includes(id) ? 'earned' : 'locked'}`;
+            div.innerHTML = achievement.icon;
+            div.title = `${achievement.name}\n${achievement.description}`;
+            container.appendChild(div);
+        });
+    }
+
+    function extractScoreFromMessage(msg) {
+        let match = msg.match(/Score: (\d+)/);
+        if (match) return parseInt(match[1]);
+        return 0;
+    }
+
+    function playSound(soundName) {
+        if (localStorage.getItem('soundEnabled') === 'true' && SOUNDS[soundName]) {
+            SOUNDS[soundName].play().catch(() => {
+                console.log('Sound playback failed or was interrupted');
+            });
+        }
+    }
+
+    function showNotification(title, message, icon = '🎮') {
+        if (localStorage.getItem('notificationsEnabled') !== 'true') return;
+        
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(title, {
+                body: message,
+                icon: '/static/images/logo.png'
+            });
+        } else {
+            // Fallback in-game notification
+            const notification = document.createElement('div');
+            notification.className = 'game-notification';
+            notification.innerHTML = `
+                <span class="notification-icon">${icon}</span>
+                <div class="notification-content">
+                    <h4>${title}</h4>
+                    <p>${message}</p>
+                </div>
+            `;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+    }
 
     window.addEventListener('quit-click', function() {
         stopTimer();
@@ -197,45 +590,31 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('restart-btn').addEventListener('click', function () {
         this.style.display = 'none';
-        document.getElementById('score-history').innerHTML = '';
+        document.getElementById('feedback-message').textContent = '';
+        document.getElementById('game-card').style.display = 'block';
         loadChallenge();
     });
 
     document.addEventListener('DOMContentLoaded', function () {
         showScoreHistory();
+        updateStatsDisplay();
+        updateAchievementDisplay();
+
+        // Settings
+        settingsBtn.addEventListener('click', () => {
+            document.getElementById('settings-modal').style.display = 'flex';
+        });
+
+        // Tutorial
+        tutorialBtn.addEventListener('click', () => {
+            document.getElementById('tutorial-modal').style.display = 'flex';
+            loadTutorialStep(0);
+        });
 
         // Always hide the username modal if username is already set
         if (localStorage.getItem('username')) {
             document.getElementById('username-modal').style.display = 'none';
         }
-
-        document.getElementById('play-btn').onclick = function () {
-            // If username is not set, prompt for it, then start game
-            if (!localStorage.getItem('username')) {
-                document.getElementById('username-modal').style.display = 'flex';
-                document.getElementById('username-submit').onclick = function () {
-                    let name = document.getElementById('username-input').value.trim();
-                    if (!name) {
-                        // Generate a fun nickname
-                        const animals = ['Tiger', 'Panda', 'Falcon', 'Otter', 'Wolf', 'Koala', 'Eagle', 'Lion', 'Bear', 'Fox'];
-                        const colors = ['Blue', 'Red', 'Green', 'Yellow', 'Purple', 'Orange', 'Silver', 'Gold', 'Aqua', 'Indigo'];
-                        name = colors[Math.floor(Math.random() * colors.length)] + animals[Math.floor(Math.random() * animals.length)] + Math.floor(Math.random() * 100);
-                    }
-                    localStorage.setItem('username', name);
-                    document.getElementById('username-modal').style.display = 'none';
-                    document.getElementById('start-screen').style.display = 'none';
-                    document.getElementById('game-card').style.display = 'block';
-                    showScoreHistory();
-                    loadChallenge();
-                };
-            } else {
-                // Username already set, just start game
-                document.getElementById('start-screen').style.display = 'none';
-                document.getElementById('game-card').style.display = 'block';
-                showScoreHistory();
-                loadChallenge();
-            }
-        };
     });
 
     // Confetti CSS
@@ -259,7 +638,163 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     document.head.appendChild(style);
 
-    getOrSetUsername();
-    showScoreHistory();
-    loadChallenge();
+    function loadTutorialStep(stepIndex) {
+        const tutorialContent = document.querySelector('.tutorial-steps');
+        const step = TUTORIAL_STEPS[stepIndex];
+        const prevBtn = document.getElementById('prev-step');
+        const nextBtn = document.getElementById('next-step');
+        const stepIndicator = document.getElementById('step-indicator');
+        
+        if (!tutorialContent) return;
+        
+        tutorialContent.innerHTML = `
+            <div class="tutorial-step">
+                <h3>${step.title}</h3>
+                <p>${step.content}</p>
+                ${step.image ? `<img src="${step.image}" alt="Tutorial step ${stepIndex + 1}">` : ''}
+            </div>
+        `;
+        
+        prevBtn.disabled = stepIndex === 0;
+        nextBtn.textContent = stepIndex === TUTORIAL_STEPS.length - 1 ? 'Finish' : 'Next';
+        stepIndicator.textContent = `${stepIndex + 1}/${TUTORIAL_STEPS.length}`;
+    }
+
+    // Tutorial button handlers
+    document.getElementById('tutorial-btn')?.addEventListener('click', function() {
+        currentTutorialStep = 0;
+        const tutorialModal = document.getElementById('tutorial-modal');
+        if (tutorialModal) {
+            tutorialModal.style.display = 'flex';
+            loadTutorialStep(currentTutorialStep);
+        }
+    });
+
+    document.getElementById('prev-step')?.addEventListener('click', function() {
+        if (currentTutorialStep > 0) {
+            currentTutorialStep--;
+            loadTutorialStep(currentTutorialStep);
+        }
+    });
+
+    document.getElementById('next-step')?.addEventListener('click', function() {
+        if (currentTutorialStep < TUTORIAL_STEPS.length - 1) {
+            currentTutorialStep++;
+            loadTutorialStep(currentTutorialStep);
+        } else {
+            document.getElementById('tutorial-modal').style.display = 'none';
+        }
+    });
+
+    // Settings functionality
+    document.getElementById('settings-btn')?.addEventListener('click', function() {
+        const settingsModal = document.getElementById('settings-modal');
+        if (settingsModal) {
+            settingsModal.style.display = 'flex';
+            
+            // Initialize settings from localStorage
+            document.getElementById('sound-toggle').checked = 
+                localStorage.getItem('soundEnabled') !== 'false';
+            document.getElementById('notifications-toggle').checked = 
+                localStorage.getItem('notificationsEnabled') !== 'false';
+            
+            // Set active theme button
+            const currentTheme = localStorage.getItem('theme') || 'dark';
+            document.querySelectorAll('.theme-selector button').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.theme === currentTheme);
+            });
+        }
+    });
+
+    // Theme selector
+    document.querySelectorAll('.theme-selector button')?.forEach(button => {
+        button.addEventListener('click', function() {
+            const theme = this.dataset.theme;
+            document.querySelectorAll('.theme-selector button').forEach(btn => 
+                btn.classList.remove('active'));
+            this.classList.add('active');
+            localStorage.setItem('theme', theme);
+            applyTheme(theme);
+        });
+    });
+
+    // Sound toggle
+    document.getElementById('sound-toggle')?.addEventListener('change', function() {
+        localStorage.setItem('soundEnabled', this.checked);
+    });
+
+    // Notifications toggle
+    document.getElementById('notifications-toggle')?.addEventListener('change', function() {
+        localStorage.setItem('notificationsEnabled', this.checked);
+        if (this.checked && 'Notification' in window) {
+            Notification.requestPermission();
+        }
+    });
+
+    // Close buttons for all modals
+    document.querySelectorAll('.modal-close')?.forEach(button => {
+        button.addEventListener('click', function() {
+            this.closest('.modal').style.display = 'none';
+        });
+    });
+
+    // Click outside modal to close
+    document.querySelectorAll('.modal')?.forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        });
+    });
+
+    // Apply theme function
+    function applyTheme(theme) {
+        const root = document.documentElement;
+        if (theme === 'light') {
+            root.style.setProperty('--card-bg', 'rgba(255, 255, 255, 0.9)');
+            root.style.setProperty('--text', '#333');
+            root.style.setProperty('--primary', '#1976d2');
+            root.style.setProperty('--secondary', '#2196f3');
+            root.style.setProperty('--accent', '#ff4081');
+        } else {
+            root.style.setProperty('--card-bg', 'rgba(10, 25, 41, 0.8)');
+            root.style.setProperty('--text', '#fff');
+            root.style.setProperty('--primary', '#90caf9');
+            root.style.setProperty('--secondary', '#42a5f5');
+            root.style.setProperty('--accent', '#ffd54f');
+        }
+    }
+
+    // Initialize theme
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    applyTheme(savedTheme);
+
+    // Add click handler for view all button
+    document.getElementById('view-all-btn')?.addEventListener('click', function() {
+        const scoreModal = document.getElementById('score-modal');
+        const allScoresList = document.getElementById('all-scores-list');
+        const scores = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
+        
+        if (scoreModal && allScoresList) {
+            // Update the all scores list
+            if (scores.length === 0) {
+                allScoresList.innerHTML = '<div class="no-scores">No scores yet!</div>';
+            } else {
+                allScoresList.innerHTML = scores.map((entry, i) => `
+                    <div class="score-entry">
+                        <span class="score-rank">#${i + 1}</span>
+                        <span class="score-name">${entry.name}</span>
+                        <span class="score-value">${entry.score} pts</span>
+                        <div class="score-details">
+                            <span class="score-mode">${entry.mode} mode</span>
+                            <span class="score-date">${entry.date}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            // Show the modal
+            scoreModal.style.display = 'flex';
+        }
+    });
 });

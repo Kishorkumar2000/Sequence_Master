@@ -10,17 +10,33 @@ class SequenceMasterV2:
         self.sequence = []
         self.hint = ""
         self.correct_answer = None
+        self.custom_seed = None
+        self.pattern_history = []
+        
+    def set_seed(self, seed):
+        """Set a custom seed for deterministic sequence generation"""
+        self.custom_seed = seed
+        
+    def get_seed(self):
+        """Get seed based on custom seed or current time"""
+        if self.custom_seed is not None:
+            return self.custom_seed
+        return int(hashlib.sha256(str(datetime.now()).encode()).hexdigest(), 16) % 1000
         
     def generate_sequence(self):
         """Generate a cryptic sequence based on level and external factors"""
         self.sequence = []
-        seed = int(hashlib.sha256(str(datetime.now()).encode()).hexdigest(), 16) % 1000
+        seed = self.get_seed()
         random.seed(seed + self.level)
-        base = random.randint(1, 10)
-        rule_set = random.randint(0, 3)
         
-        # Dynamic rule based on time and level
-        time_factor = datetime.now().second % 5  # Changes every second
+        # Ensure we don't repeat recent patterns
+        rule_set = random.randint(0, 7)  # Extended pattern types
+        while rule_set in self.pattern_history[-3:]:  # Avoid last 3 patterns
+            rule_set = random.randint(0, 7)
+        self.pattern_history.append(rule_set)
+        
+        base = random.randint(1, 10)
+        time_factor = datetime.now().second % 5
         
         if rule_set == 0:  # Twisted Arithmetic
             diff = (self.level % 3 + 1) * time_factor
@@ -38,7 +54,7 @@ class SequenceMasterV2:
             for i in range(5):
                 next_num = self.sequence[-1] * ratio
                 if str(next_num)[::-1].isdigit():
-                    next_num = int(str(next_num)[::-1])  # Reverse digits
+                    next_num = int(str(next_num)[::-1])
                 self.sequence.append(next_num)
             self.hint = "Growth reflects itself, but only when it can see its own face."
                 
@@ -54,7 +70,57 @@ class SequenceMasterV2:
                 self.sequence.append(next_num)
             self.hint = "Numbers speak in letters, and their lengths lead the way."
                 
-        else:  # Chaotic Blend
+        elif rule_set == 3:  # Fibonacci Twist
+            self.sequence = [base]
+            second = base + self.level
+            self.sequence.append(second)
+            for i in range(4):
+                next_num = self.sequence[-1] + self.sequence[-2]
+                if i % 2 == 0:
+                    next_num = next_num % (50 * self.level)  # Keep numbers manageable
+                self.sequence.append(next_num)
+            self.hint = "Each step looks back twice, but sometimes needs to stay grounded."
+            
+        elif rule_set == 4:  # Prime Dance
+            def next_prime(n):
+                while True:
+                    n += 1
+                    if all(n % i != 0 for i in range(2, int(n ** 0.5) + 1)):
+                        return n
+                        
+            self.sequence = [base]
+            current = base
+            for _ in range(5):
+                if len(self.sequence) % 2 == 0:
+                    current = next_prime(current)
+                else:
+                    current = current * 2 - 1
+                self.sequence.append(current)
+            self.hint = "Primes lead the dance, but take breaks to double back."
+            
+        elif rule_set == 5:  # Digital Root Pattern
+            def digital_root(n):
+                while n > 9:
+                    n = sum(int(d) for d in str(n))
+                return n
+                
+            self.sequence = [base]
+            for i in range(5):
+                next_num = self.sequence[-1] * (i + 2)
+                next_num = digital_root(next_num) * self.level
+                self.sequence.append(next_num)
+            self.hint = "When numbers grow too large, they find their root and grow again."
+            
+        elif rule_set == 6:  # Binary Pattern
+            self.sequence = [base]
+            for i in range(5):
+                binary = bin(self.sequence[-1])[2:]  # Convert to binary string
+                rotated = binary[1:] + binary[0]  # Rotate binary digits
+                next_num = int(rotated, 2) + self.level
+                self.sequence.append(next_num)
+            self.hint = "The binary dance: rotate and grow."
+            
+        else:  # Chaotic Blend with Level Complexity
             self.sequence = [base]
             for i in range(5):
                 if i % 3 == 0:
@@ -62,12 +128,56 @@ class SequenceMasterV2:
                 elif i % 3 == 1:
                     next_num = self.sequence[-1] + time_factor
                 else:
-                    next_num = self.sequence[-1] ** 2 % 100
+                    next_num = (self.sequence[-1] ** 2 % 100) + self.level
                 self.sequence.append(next_num)
-            self.hint = "Three rules wrestle: multiply, add time, then square and trim."
+            self.hint = "Three rules wrestle: multiply, add time, then square and grow."
                 
         self.correct_answer = self.sequence[-1]
         self.sequence[-1] = '?'
+        
+    def get_difficulty_rating(self):
+        """Calculate the difficulty rating of the current sequence"""
+        # Base difficulty on pattern type and level
+        base_difficulty = self.level * 0.5
+        pattern_difficulty = {
+            0: 1,    # Twisted Arithmetic
+            1: 1.2,  # Mirrored Geometric
+            2: 1.5,  # Wordplay Numbers
+            3: 1.8,  # Fibonacci Twist
+            4: 2,    # Prime Dance
+            5: 1.7,  # Digital Root
+            6: 1.9,  # Binary Pattern
+            7: 2.2   # Chaotic Blend
+        }
+        return base_difficulty * pattern_difficulty[self.pattern_history[-1]]
+        
+    def get_learning_tip(self):
+        """Get a learning tip based on the current pattern"""
+        tips = {
+            0: "Look for arithmetic patterns that alternate between operations.",
+            1: "Practice reading numbers backwards and identifying geometric growth.",
+            2: "Strengthen the connection between numbers and their word representations.",
+            3: "Study the Fibonacci sequence and its variations.",
+            4: "Learn to recognize prime numbers and their patterns.",
+            5: "Practice calculating digital roots of numbers.",
+            6: "Convert numbers to binary and observe patterns.",
+            7: "Break down complex patterns into simpler steps."
+        }
+        return tips[self.pattern_history[-1]]
+        
+    def get_pattern_name(self):
+        """Get the name of the current pattern type"""
+        names = {
+            0: "Twisted Arithmetic",
+            1: "Mirrored Geometric",
+            2: "Wordplay Numbers",
+            3: "Fibonacci Twist",
+            4: "Prime Dance",
+            5: "Digital Root",
+            6: "Binary Pattern",
+            7: "Chaotic Blend"
+        }
+        return names[self.pattern_history[-1]]
         
     def display_sequence(self):
         """Display sequence and hint"""

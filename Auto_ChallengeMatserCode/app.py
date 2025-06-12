@@ -1,78 +1,199 @@
-from flask import Flask, session, jsonify, request, render_template
+from flask import Flask, render_template, jsonify, request, session
 from sequenceMaster import SequenceMasterV2
+from datetime import datetime, timedelta
+import json
 import os
+import hashlib
 
-from sequenceMaster import SequenceMasterV2
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-GAMES = {}
 
-def get_game_for_session():
-    sid = session.get('sid')
-    if not sid:
-        sid = os.urandom(8).hex()
-        session['sid'] = sid
-    if sid not in GAMES:
-        GAMES[sid] = SequenceMasterV2()
-    return GAMES[sid]
+# Game modes configuration
+GAME_MODES = {
+    'classic': {'timer': 20, 'score_multiplier': 1},
+    'speed': {'timer': 10, 'score_multiplier': 2},
+    'zen': {'timer': None, 'score_multiplier': 0.5},
+    'daily': {'timer': 30, 'score_multiplier': 3}
+}
 
+# Achievement definitions
+ACHIEVEMENTS = {
+    'quick_thinker': {'name': 'Quick Thinker', 'description': 'Complete a level in under 5 seconds', 'icon': '⚡'},
+    'perfectionist': {'name': 'Perfectionist', 'description': 'Get 5 correct answers in a row', 'icon': '🎯'},
+    'zen_master': {'name': 'Zen Master', 'description': 'Score 1000 points in Zen mode', 'icon': '🧘'},
+    'speed_demon': {'name': 'Speed Demon', 'description': 'Score 2000 points in Speed mode', 'icon': '🏃'},
+    'daily_warrior': {'name': 'Daily Warrior', 'description': 'Complete 5 daily challenges', 'icon': '📅'},
+    'pattern_master': {'name': 'Pattern Master', 'description': 'Solve a level 10 sequence', 'icon': '🧩'}
+}
 
-# ... (keep your GAMES and get_game_for_session as before) ...
+def get_daily_challenge():
+    """Generate a consistent daily challenge based on the date"""
+    today = datetime.now().strftime('%Y-%m-%d')
+    seed = int(hashlib.sha256(today.encode()).hexdigest(), 16)
+    # Use the seed to generate a specific sequence for the day
+    return seed
+
+def check_achievements(user_stats):
+    """Check and award achievements based on user stats"""
+    earned = []
+    if user_stats.get('fastest_solve', 999) < 5:
+        earned.append('quick_thinker')
+    if user_stats.get('current_streak', 0) >= 5:
+        earned.append('perfectionist')
+    if user_stats.get('zen_high_score', 0) >= 1000:
+        earned.append('zen_master')
+    if user_stats.get('speed_high_score', 0) >= 2000:
+        earned.append('speed_demon')
+    if user_stats.get('daily_completed', 0) >= 5:
+        earned.append('daily_warrior')
+    if user_stats.get('highest_level', 0) >= 10:
+        earned.append('pattern_master')
+    return earned
 
 @app.route('/')
-def index():
-    return render_template('index.html')
+def home():
+    return render_template('game.html')
 
-@app.route('/api/challenge', methods=['GET'])
-def api_challenge():
-    game = get_game_for_session()
+@app.route('/api/challenge')
+def get_challenge():
+    mode = session.get('game_mode', 'classic')
+    if mode == 'daily' and session.get('daily_completed'):
+        return jsonify({'error': 'Daily challenge already completed'}), 400
+        
+    game = SequenceMasterV2()
+    if mode == 'daily':
+        game.set_seed(get_daily_challenge())
+    
+    game.level = session.get('level', 1)
+    game.score = session.get('score', 0)
     game.generate_sequence()
-    # Store the correct answer in the session
-    session['last_answer'] = game.correct_answer
+    
+    session['last_sequence'] = game.sequence
+    session['correct_answer'] = game.correct_answer
+    session['start_time'] = datetime.now().timestamp()
+    
     return jsonify({
+        'sequence': game.sequence,
+        'hint': game.hint,
         'level': game.level,
         'score': game.score,
-        'sequence': game.sequence,
-        'hint': game.hint
+        'timer': GAME_MODES[mode]['timer'],
+        'mode': mode
     })
 
 @app.route('/api/answer', methods=['POST'])
-def api_answer():
-    game = get_game_for_session()
+def check_answer():
     data = request.get_json()
     answer = data.get('answer')
-    message = ''
-    game_over = False
+    mode = session.get('game_mode', 'classic')
+    
+    if not answer:
+        return jsonify({'error': 'No answer provided'}), 400
+        
     try:
-        answer_int = int(answer)
-        if answer_int == game.correct_answer:
-            game.score += 100 * game.level
-            game.level += 1
-            message = 'Correct! Next challenge awaits...'
-        else:
-            # Store the correct answer before ending the game
-            session['last_answer'] = game.correct_answer
-            message = f'Wrong! The correct answer was {game.correct_answer}. Final Score: {game.score}'
-            game_over = True
-            GAMES.pop(session['sid'], None)
-    except Exception:
-        message = 'Please enter a valid number.'
-    return jsonify({'message': message, 'game_over': game_over})
+        answer = int(answer)
+    except ValueError:
+        return jsonify({'error': 'Invalid answer format'}), 400
+        
+    correct_answer = session.get('correct_answer')
+    if correct_answer is None:
+        return jsonify({'error': 'No active challenge'}), 400
+        
+    # Calculate time taken
+    start_time = session.get('start_time')
+    time_taken = datetime.now().timestamp() - start_time if start_time else 999
+    
+    # Update user stats
+    user_stats = session.get('user_stats', {})
+    if answer == correct_answer:
+        # Calculate score based on time and mode
+        time_bonus = int(200 / (time_taken + 1)) if mode != 'zen' else 100
+        score_gain = time_bonus * session.get('level', 1) * GAME_MODES[mode]['score_multiplier']
+        
+        new_score = session.get('score', 0) + score_gain
+        new_level = session.get('level', 1) + 1
+        
+        session['score'] = new_score
+        session['level'] = new_level
+        
+        # Update stats
+        user_stats['games_played'] = user_stats.get('games_played', 0) + 1
+        user_stats['current_streak'] = user_stats.get('current_streak', 0) + 1
+        user_stats['highest_level'] = max(user_stats.get('highest_level', 0), new_level)
+        user_stats['fastest_solve'] = min(user_stats.get('fastest_solve', 999), time_taken)
+        
+        # Mode-specific stats
+        mode_score_key = f'{mode}_high_score'
+        user_stats[mode_score_key] = max(user_stats.get(mode_score_key, 0), new_score)
+        
+        if mode == 'daily':
+            user_stats['daily_completed'] = user_stats.get('daily_completed', 0) + 1
+            session['daily_completed'] = True
+            
+        # Check for new achievements
+        new_achievements = check_achievements(user_stats)
+        user_stats['achievements'] = list(set(user_stats.get('achievements', []) + new_achievements))
+        
+        session['user_stats'] = user_stats
+        
+        return jsonify({
+            'message': f'Correct! Score: {new_score}',
+            'game_over': False,
+            'new_achievements': new_achievements
+        })
+    else:
+        user_stats['current_streak'] = 0
+        session['user_stats'] = user_stats
+        return jsonify({
+            'message': f'Game Over! Final Score: {session.get("score", 0)}',
+            'game_over': True,
+            'correct_answer': correct_answer
+        })
 
-@app.route('/api/quit', methods=['POST'])
-def api_quit():
-    game = get_game_for_session()
-    # Store the correct answer before ending the game
-    session['last_answer'] = game.correct_answer
-    message = f'Game Over! Final Score: {game.score}'
-    GAMES.pop(session['sid'], None)
-    return jsonify({'message': message, 'game_over': True})
+@app.route('/api/stats')
+def get_stats():
+    return jsonify(session.get('user_stats', {}))
 
-@app.route('/api/last_answer', methods=['GET'])
-def last_answer():
-    # Assuming you store the last answer in the session or a global variable
-    last_answer = session.get('last_answer', None)
-    return jsonify({'last_answer': last_answer})
+@app.route('/api/mode', methods=['POST'])
+def set_mode():
+    data = request.get_json()
+    mode = data.get('mode')
+    if mode not in GAME_MODES:
+        return jsonify({'error': 'Invalid game mode'}), 400
+        
+    session['game_mode'] = mode
+    session['score'] = 0
+    session['level'] = 1
+    
+    return jsonify({'status': 'success'})
+
+@app.route('/api/achievements')
+def get_achievements():
+    user_stats = session.get('user_stats', {})
+    earned = user_stats.get('achievements', [])
+    
+    achievements = {
+        id: {**data, 'earned': id in earned}
+        for id, data in ACHIEVEMENTS.items()
+    }
+    
+    return jsonify(achievements)
+
+@app.route('/api/leaderboard')
+def get_leaderboard():
+    # In a real app, this would fetch from a database
+    # For now, return dummy data
+    return jsonify([
+        {'name': 'Alice', 'score': 3200, 'mode': 'classic'},
+        {'name': 'Bob', 'score': 2700, 'mode': 'speed'},
+        {'name': 'Charlie', 'score': 2100, 'mode': 'zen'}
+    ])
+
+@app.route('/api/last_answer')
+def get_last_answer():
+    return jsonify({
+        'last_answer': session.get('correct_answer')
+    })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5001)

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Sequence Master Game</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+
+<body>
+    <div class="game-layout">
+        <div class="sidebar">
+            <h2>Menu</h2>
+            <div>
+                <h3>How to Play</h3>
+                <ul>
+                    <li>Observe the sequence and hint.</li>
+                    <li>Enter the missing number before time runs out!</li>
+                    <li>Each level is harder and more cryptic.</li>
+                </ul>
+            </div>
+            <div>
+                <h3>About</h3>
+                <p>This game is designed to challenge your logic and automation skills. Can you master the sequence?</p>
+            </div>
+            <div>
+                <h3>Leaderboard</h3>
+                <ol>
+                    <li>Alice - 3200</li>
+                    <li>Bob - 2700</li>
+                    <li>Charlie - 2100</li>
+                </ol>
+            </div>
+            <div id="score-history" class="score-history">
+                <h3>Recent Scores <button class="view-all-scores" id="view-all-btn">View All</button></h3>
+                <ul id="recent-scores-list">
+                    <!-- Recent scores will be populated here -->
+                </ul>
+            </div>
+        </div>
+        <div class="game-main">
+            <div class="game-card" id="game-card" style="display:none;">
+                <h1>Sequence Master V2: <span style="color:#1976d2;">The Cryptic Progression!</span></h1>
+                <iframe id="scoreboard-iframe" src="{{ url_for('static', filename='scoreboard.html') }}"
+                    class="scoreboard-iframe"></iframe>
+                <div id="timer-bar-bg">
+                    <div id="timer-bar-fill"></div>
+                    <span id="timer-countdown">20</span>
+                </div>
+                <div class="sequence-display">
+                    <div id="level-score"><b>Level 1</b> - <b>Score: 0</b></div>
+                    <div id="sequence">Sequence: 2 4 6 8 ?</div>
+                </div>
+                <div id="hint-message" class="hint-message">Hint will appear here.</div>
+                <form class="answer-form" id="answer-form">
+                    <input type="text" id="answer-input" placeholder="Enter your answer" autocomplete="off" required>
+                    <button type="submit" id="submit-btn">Submit</button>
+                    <button type="button" id="quit-btn">Quit</button>
+                </form>
+                <div class="feedback-message" id="feedback-message">Feedback will appear here.</div>
+                <button id="restart-btn" style="display:none; margin-top:1em;">Restart Game</button>
+                <iframe id="funfact-iframe" src="{{ url_for('static', filename='funfact.html') }}"
+                    class="funfact-iframe"></iframe>
+            </div>
+            <div id="start-screen"
+                style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh;">
+                <h1>Welcome to Sequence Master!</h1>
+                <div class="game-modes">
+                    <h2>Select Game Mode</h2>
+                    <div class="mode-grid">
+                        <div class="mode-card" data-mode="classic" tabindex="0" role="button">
+                            <h3>Classic Mode</h3>
+                            <p>Original sequence challenge with 20s timer</p>
+                            <div class="mode-stats">
+                                <span>Best Score: <span id="classic-best">0</span></span>
+                                <span>Games: <span id="classic-games">0</span></span>
+                            </div>
+                        </div>
+                        <div class="mode-card" data-mode="speed" tabindex="0" role="button">
+                            <h3>Speed Mode</h3>
+                            <p>10s timer but 2x points!</p>
+                            <div class="mode-stats">
+                                <span>Best Score: <span id="speed-best">0</span></span>
+                                <span>Games: <span id="speed-games">0</span></span>
+                            </div>
+                        </div>
+                        <div class="mode-card" data-mode="zen" tabindex="0" role="button">
+                            <h3>Zen Mode</h3>
+                            <p>No timer, complex patterns</p>
+                            <div class="mode-stats">
+                                <span>Best Score: <span id="zen-best">0</span></span>
+                                <span>Games: <span id="zen-games">0</span></span>
+                            </div>
+                        </div>
+                        <div class="mode-card" data-mode="daily" tabindex="0" role="button">
+                            <h3>Daily Challenge</h3>
+                            <p>One attempt at today's sequence</p>
+                            <div class="mode-stats">
+                                <span>Streak: <span id="daily-streak">0</span></span>
+                                <span>Completed: <span id="daily-completed">No</span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="achievements-preview">
+                    <h3>Your Progress</h3>
+                    <div class="achievement-icons">
+                        <!-- Achievement icons will be dynamically added -->
+                    </div>
+                    <div class="stats-summary">
+                        <span>Total Games: <span id="total-games">0</span></span>
+                        <span>Global Rank: <span id="global-rank">--</span></span>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button id="play-btn" style="font-size:1.2em; padding:0.7em 2em; margin-top:2em;" disabled>Select a
+                        Mode</button>
+                    <button id="tutorial-btn" class="secondary-btn">How to Play</button>
+                    <button id="settings-btn" class="secondary-btn">Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer class="game-footer">&copy; 2024 Sequence Master Challenge | Powered by Flask</footer>
+
+    <!-- Username Modal -->
+    <div id="username-modal" class="modal">
+        <div class="modal-content">
+            <h2>Enter your name for the leaderboard:</h2>
+            <input type="text" id="username-input" placeholder="Your name or nickname">
+            <button id="username-submit">Start</button>
+            <p>(Leave blank for a fun random name!)</p>
+        </div>
+    </div>
+
+    <!-- Score History Modal -->
+    <div id="score-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>All Score History</h2>
+                <button class="modal-close" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-list" id="all-scores-list">
+                <!-- All scores will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="settings-grid">
+                <div class="setting-group">
+                    <h3>Theme</h3>
+                    <div class="theme-selector">
+                        <button data-theme="dark" class="active">Dark</button>
+                        <button data-theme="light">Light</button>
+                        <button data-theme="auto">Auto</button>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <h3>Sound</h3>
+                    <label class="switch">
+                        <input type="checkbox" id="sound-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <h3>Notifications</h3>
+                    <label class="switch">
+                        <input type="checkbox" id="notifications-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="setting-group">
+                    <h3>Keyboard Shortcuts</h3>
+                    <button id="shortcuts-btn">View Shortcuts</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tutorial Modal -->
+    <div id="tutorial-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>How to Play</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="tutorial-steps">
+                <!-- Tutorial content will be dynamically loaded -->
+            </div>
+            <div class="tutorial-nav">
+                <button id="prev-step" disabled>Previous</button>
+                <span id="step-indicator">1/5</span>
+                <button id="next-step">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
