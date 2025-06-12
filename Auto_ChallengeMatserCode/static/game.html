@@ -40,7 +40,12 @@
                     <li>Charlie - 2100</li>
                 </ol>
             </div>
-            <div id="score-history" class="score-history"></div>
+            <div id="score-history" class="score-history">
+                <h3>Recent Scores <button class="view-all-scores" id="view-all-btn">View All</button></h3>
+                <ul id="recent-scores-list">
+                    <!-- Recent scores will be populated here -->
+                </ul>
+            </div>
         </div>
         <div class="game-main">
             <div class="game-card" id="game-card" style="display:none;">
@@ -82,6 +87,18 @@
             <p style="margin-top:1em; color:#888;">(Leave blank for a fun random name!)</p>
         </div>
     </div>
+    <!-- Add Score History Modal -->
+    <div id="score-modal" class="score-modal">
+        <div class="score-modal-content">
+            <div class="score-modal-header">
+                <h2>All Score History</h2>
+                <button class="score-modal-close" id="close-modal">&times;</button>
+            </div>
+            <div class="score-modal-list" id="all-scores-list">
+                <!-- All scores will be populated here -->
+            </div>
+        </div>
+    </div>
     <script>
         let timerDuration = 20; // seconds
         let timerInterval = null;
@@ -118,29 +135,44 @@
 
         function showScoreHistory() {
             let scores = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
-            let html = '<h3>Recent Scores</h3><ul>';
+
+            // Update recent scores (show only last 3)
+            let recentHtml = '';
             if (scores.length === 0) {
-                html += '<li>No games played yet.</li>';
+                recentHtml = '<li>No games played yet.</li>';
             } else {
-                scores.forEach((entry, i) => {
-                    html += `<li>${entry.name} — ${entry.score} <span style="color:#888;font-size:0.9em;">(${entry.date})</span></li>`;
+                scores.slice(0, 3).forEach((entry, i) => {
+                    recentHtml += `<li>${entry.name} — ${entry.score} <span style="color:#888;font-size:0.9em;">(${entry.date})</span></li>`;
                 });
             }
-            html += '</ul>';
-            document.getElementById('score-history').innerHTML = html;
+            document.getElementById('recent-scores-list').innerHTML = recentHtml;
         }
 
         function startTimer(onTimeout) {
             let timeLeft = timerDuration;
             const bar = document.getElementById('timer-bar-fill');
             const countdown = document.getElementById('timer-countdown');
+
+            // Reset timer state
             bar.style.width = '100%';
+            bar.style.display = 'block';
+            countdown.style.display = 'block';
             countdown.textContent = timeLeft;
+
             if (timerInterval) clearInterval(timerInterval);
+
             timerInterval = setInterval(() => {
                 timeLeft--;
-                bar.style.width = ((timeLeft / timerDuration) * 100) + '%';
+                const percentage = (timeLeft / timerDuration) * 100;
+                bar.style.width = percentage + '%';
                 countdown.textContent = timeLeft;
+
+                // Add warning colors
+                if (timeLeft <= 5) {
+                    bar.style.background = 'linear-gradient(90deg, #ff4081, #ff0000)';
+                    countdown.style.color = '#ff4081';
+                }
+
                 if (timeLeft <= 0) {
                     clearInterval(timerInterval);
                     bar.style.width = '0%';
@@ -151,7 +183,13 @@
         }
 
         function stopTimer() {
-            if (timerInterval) clearInterval(timerInterval);
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                const bar = document.getElementById('timer-bar-fill');
+                const countdown = document.getElementById('timer-countdown');
+                bar.style.width = '0%';
+                countdown.textContent = '0';
+            }
         }
 
         function disableGame(finalScore) {
@@ -277,6 +315,36 @@
                         let score = extractScoreFromMessage(data.message);
                         disableGame(score);
                     });
+            });
+
+            // Add modal functionality
+            const modal = document.getElementById('score-modal');
+            const viewAllBtn = document.getElementById('view-all-btn');
+            const closeModal = document.getElementById('close-modal');
+
+            function showAllScores() {
+                let scores = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
+                let allScoresHtml = '';
+
+                scores.forEach((entry, i) => {
+                    allScoresHtml += `
+                        <div class="score-entry">
+                            <span class="score-rank">#${i + 1}</span>
+                            <span class="score-name">${entry.name}</span>
+                            <span class="score-value">${entry.score}</span>
+                            <span class="score-date">${entry.date}</span>
+                        </div>
+                    `;
+                });
+
+                document.getElementById('all-scores-list').innerHTML = allScoresHtml || '<p>No scores yet!</p>';
+                modal.style.display = 'flex';
+            }
+
+            viewAllBtn.addEventListener('click', showAllScores);
+            closeModal.addEventListener('click', () => modal.style.display = 'none');
+            window.addEventListener('click', (e) => {
+                if (e.target === modal) modal.style.display = 'none';
             });
         });
     </script>
