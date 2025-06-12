@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Sequence Master Game</title>
+    <!-- <style>
+        * {
+            animation: none !important;
+            transition: none !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            display: block !important;
+        }
+    </style> -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="game-layout">
+        <div class="sidebar">
+            <h2>Menu</h2>
+            <div>
+                <h3>How to Play</h3>
+                <ul>
+                    <li>Observe the sequence and hint.</li>
+                    <li>Enter the missing number before time runs out!</li>
+                    <li>Each level is harder and more cryptic.</li>
+                </ul>
+            </div>
+            <div>
+                <h3>About</h3>
+                <p>This game is designed to challenge your logic and automation skills. Can you master the sequence?</p>
+            </div>
+            <div>
+                <h3>Leaderboard</h3>
+                <ol>
+                    <li>Alice - 3200</li>
+                    <li>Bob - 2700</li>
+                    <li>Charlie - 2100</li>
+                </ol>
+            </div>
+            <div id="score-history" class="score-history"></div>
+        </div>
+        <div class="game-main">
+            <div class="game-card" id="game-card" style="display:none;">
+                <h1>Sequence Master V2: <span style="color:#1976d2;">The Cryptic Progression!</span></h1>
+                <iframe id="scoreboard-iframe" src="scoreboard.html" class="scoreboard-iframe"></iframe>
+                <div id="timer-bar-bg">
+                    <div id="timer-bar-fill"></div>
+                    <span id="timer-countdown">20</span>
+                </div>
+                <div class="sequence-display">
+                    <div id="level-score"><b>Level 1</b> - <b>Score: 0</b></div>
+                    <div id="sequence">Sequence: 2 4 6 8 ?</div>
+                </div>
+                <div id="hint-message" class="hint-message">Hint will appear here.</div>
+                <form class="answer-form" id="answer-form">
+                    <input type="text" id="answer-input" placeholder="Enter your answer" autocomplete="off" required>
+                    <button type="submit" id="submit-btn">Submit</button>
+                    <button type="button" id="quit-btn">Quit</button>
+                </form>
+                <div class="feedback-message" id="feedback-message">Feedback will appear here.</div>
+                <button id="restart-btn" style="display:none; margin-top:1em;">Restart Game</button>
+                <iframe id="funfact-iframe" src="funfact.html" class="funfact-iframe"></iframe>
+            </div>
+            <div id="start-screen"
+                style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh;">
+                <h1>Welcome to Sequence Master!</h1>
+                <button id="play-btn" style="font-size:1.2em; padding:0.7em 2em; margin-top:2em;">Play</button>
+            </div>
+        </div>
+    </div>
+    <footer class="game-footer">&copy; 2024 Sequence Master Challenge | Powered by Flask</footer>
+    <div id="username-modal"
+        style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#fff; padding:2em; border-radius:12px; max-width:90vw; text-align:center;">
+            <h2>Enter your name for the leaderboard:</h2>
+            <input type="text" id="username-input" placeholder="Your name or nickname"
+                style="padding:0.5em; font-size:1em;">
+            <button id="username-submit" style="margin-left:1em;">Start</button>
+            <p style="margin-top:1em; color:#888;">(Leave blank for a fun random name!)</p>
+        </div>
+    </div>
+    <script>
+        let timerDuration = 20; // seconds
+        let timerInterval = null;
+        let gameOver = false;
+
+        function getOrSetUsername(callback) {
+            let username = localStorage.getItem('username');
+            if (!username) {
+                document.getElementById('username-modal').style.display = 'flex';
+                document.getElementById('username-submit').onclick = function () {
+                    let name = document.getElementById('username-input').value.trim();
+                    if (!name) {
+                        // Generate a fun nickname
+                        const animals = ['Tiger', 'Panda', 'Falcon', 'Otter', 'Wolf', 'Koala', 'Eagle', 'Lion', 'Bear', 'Fox'];
+                        const colors = ['Blue', 'Red', 'Green', 'Yellow', 'Purple', 'Orange', 'Silver', 'Gold', 'Aqua', 'Indigo'];
+                        name = colors[Math.floor(Math.random() * colors.length)] + animals[Math.floor(Math.random() * animals.length)] + Math.floor(Math.random() * 100);
+                    }
+                    localStorage.setItem('username', name);
+                    document.getElementById('username-modal').style.display = 'none';
+                    if (callback) callback();
+                };
+                return null;
+            }
+            return username;
+        }
+
+        function saveScore(score) {
+            let username = localStorage.getItem('username') || 'Player';
+            let scores = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
+            scores.unshift({ name: username, score: score, date: new Date().toLocaleString() });
+            if (scores.length > 10) scores = scores.slice(0, 10);
+            localStorage.setItem('scoreHistory', JSON.stringify(scores));
+        }
+
+        function showScoreHistory() {
+            let scores = JSON.parse(localStorage.getItem('scoreHistory') || '[]');
+            let html = '<h3>Recent Scores</h3><ul>';
+            if (scores.length === 0) {
+                html += '<li>No games played yet.</li>';
+            } else {
+                scores.forEach((entry, i) => {
+                    html += `<li>${entry.name} — ${entry.score} <span style="color:#888;font-size:0.9em;">(${entry.date})</span></li>`;
+                });
+            }
+            html += '</ul>';
+            document.getElementById('score-history').innerHTML = html;
+        }
+
+        function startTimer(onTimeout) {
+            let timeLeft = timerDuration;
+            const bar = document.getElementById('timer-bar-fill');
+            const countdown = document.getElementById('timer-countdown');
+            bar.style.width = '100%';
+            countdown.textContent = timeLeft;
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                bar.style.width = ((timeLeft / timerDuration) * 100) + '%';
+                countdown.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    bar.style.width = '0%';
+                    countdown.textContent = '0';
+                    if (typeof onTimeout === 'function') onTimeout();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+        }
+
+        function disableGame(finalScore) {
+            document.getElementById('answer-input').disabled = true;
+            document.getElementById('submit-btn').disabled = true;
+            document.getElementById('quit-btn').disabled = true;
+            document.getElementById('restart-btn').style.display = 'inline-block';
+            stopTimer();
+            gameOver = true;
+            if (typeof finalScore === 'number') {
+                saveScore(finalScore);
+                showScoreHistory();
+            }
+        }
+
+        function extractScoreFromMessage(msg) {
+            let match = msg.match(/Score: (\\d+)/);
+            if (match) return parseInt(match[1]);
+            return 0;
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            showScoreHistory();
+
+            document.getElementById('play-btn').onclick = function () {
+                // If username is not set, prompt for it, then start game
+                if (!localStorage.getItem('username')) {
+                    document.getElementById('username-modal').style.display = 'flex';
+                    document.getElementById('username-submit').onclick = function () {
+                        let name = document.getElementById('username-input').value.trim();
+                        if (!name) {
+                            // Generate a fun nickname
+                            const animals = ['Tiger', 'Panda', 'Falcon', 'Otter', 'Wolf', 'Koala', 'Eagle', 'Lion', 'Bear', 'Fox'];
+                            const colors = ['Blue', 'Red', 'Green', 'Yellow', 'Purple', 'Orange', 'Silver', 'Gold', 'Aqua', 'Indigo'];
+                            name = colors[Math.floor(Math.random() * colors.length)] + animals[Math.floor(Math.random() * animals.length)] + Math.floor(Math.random() * 100);
+                        }
+                        localStorage.setItem('username', name);
+                        document.getElementById('username-modal').style.display = 'none';
+                        document.getElementById('start-screen').style.display = 'none';
+                        document.getElementById('game-card').style.display = 'block';
+                        showScoreHistory();
+                        loadChallenge();
+                    };
+                } else {
+                    // Username already set, just start game
+                    document.getElementById('start-screen').style.display = 'none';
+                    document.getElementById('game-card').style.display = 'block';
+                    showScoreHistory();
+                    loadChallenge();
+                }
+            };
+
+            document.getElementById('restart-btn').addEventListener('click', function () {
+                this.style.display = 'none';
+                document.getElementById('feedback-message').textContent = '';
+                document.getElementById('game-card').style.display = 'block';
+                loadChallenge();
+            });
+
+            function loadChallenge() {
+                fetch('/api/challenge')
+                    .then(res => res.json())
+                    .then(data => {
+                        document.getElementById('level-score').innerHTML = `<b>Level ${data.level}</b> - <b>Score: ${data.score}</b>`;
+                        document.getElementById('sequence').textContent = `Sequence: ${data.sequence.join(' ')}`;
+                        document.getElementById('hint-message').textContent = data.hint;
+                        document.getElementById('feedback-message').textContent = '';
+                        document.getElementById('answer-input').value = '';
+                        document.getElementById('answer-input').disabled = false;
+                        document.getElementById('submit-btn').disabled = false;
+                        document.getElementById('quit-btn').disabled = false;
+                        document.getElementById('restart-btn').style.display = 'none';
+                        gameOver = false;
+                        startTimer(() => {
+                            fetch('/api/last_answer')
+                                .then(res => res.json())
+                                .then(data => {
+                                    let answerMsg = data.last_answer !== null
+                                        ? `⏰ Time is up! Game Over. The correct answer was: <b>${data.last_answer}</b>`
+                                        : '⏰ Time is up! Game Over.';
+                                    document.getElementById('feedback-message').innerHTML = answerMsg;
+                                    let score = 0;
+                                    const scoreText = document.getElementById('level-score').textContent;
+                                    if (scoreText.match(/Score: (\d+)/)) {
+                                        score = parseInt(scoreText.match(/Score: (\d+)/)[1]);
+                                    }
+                                    disableGame(score);
+                                });
+                        });
+                    });
+            }
+
+            // Handle answer submission
+            document.getElementById('answer-form').addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (gameOver) return;
+                const answer = document.getElementById('answer-input').value.trim();
+                fetch('/api/answer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer })
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        document.getElementById('feedback-message').textContent = data.message;
+                        if (data.game_over) {
+                            let score = extractScoreFromMessage(data.message);
+                            disableGame(score);
+                        } else {
+                            stopTimer();
+                            loadChallenge();
+                        }
+                    });
+            });
+
+            // Handle quit button
+            document.getElementById('quit-btn').addEventListener('click', function () {
+                if (gameOver) return;
+                fetch('/api/quit', { method: 'POST' })
+                    .then(res => res.json())
+                    .then(data => {
+                        document.getElementById('feedback-message').textContent = data.message;
+                        let score = extractScoreFromMessage(data.message);
+                        disableGame(score);
+                    });
+            });
+        });
+    </script>
+</body>
+
+</html>

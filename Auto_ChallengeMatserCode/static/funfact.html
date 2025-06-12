@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Fun Fact</title>
+    <style>
+        body {
+            margin: 0;
+            background: #212b36;
+            color: #90caf9;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+        }
+
+        .funfact {
+            padding: 0.2em 0.8em;
+            border-radius: 8px;
+            background: rgba(144, 202, 249, 0.10);
+            box-shadow: 0 1px 4px rgba(25, 118, 210, 0.10);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="funfact" id="funfact-text">
+        Did you know? The first known sequence puzzle dates back to ancient Greece!
+    </div>
+    <script>
+        const facts = [
+            "Did you know? The first known sequence puzzle dates back to ancient Greece!",
+            "Fun Fact: Shadow DOM makes automation much harder!",
+            "Tip: Look for patterns in both numbers and words.",
+            "QA Challenge: Can you automate across iframes and custom elements?",
+            "Did you know? The number π (pi) is an infinite, non-repeating sequence."
+        ];
+        setInterval(() => {
+            document.getElementById('funfact-text').textContent = facts[Math.floor(Math.random() * facts.length)];
+        }, 5000);
+    </script>
+</body>
+
+</html>

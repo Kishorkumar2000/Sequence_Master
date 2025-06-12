@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Sequence Master Challenge</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        /* Extra styling for iframe border */
+        #game-iframe {
+            border: 3px solid #1976d2;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+            width: 480px;
+            height: 480px;
+            margin: 2rem auto;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <iframe id="game-iframe" src="{{ url_for('static', filename='game.html') }}"></iframe>
+    <script>
+        // Optionally, you can communicate with the iframe here if needed
+    </script>
+</body>
+
+</html>

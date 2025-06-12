@@ -1,0 +1,445 @@
+html,
+body {
+    background: #fff !important;
+    color: #111 !important;
+}
+
+.game-card,
+.sidebar,
+.game-main,
+.game-layout,
+.game-footer {
+    background: #fff !important;
+    color: #111 !important;
+    border: 1px solid #ccc !important;
+}
+
+input,
+button {
+    color: #111 !important;
+    background: #eee !important;
+}
+
+html,
+body {
+    width: 100vw;
+    height: 100vh;
+    min-width: 100vw;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(120deg, #232526, #414345 100%);
+    color: #222;
+    overflow-x: hidden;
+}
+
+body {
+    min-height: 100vh;
+    margin: 0;
+    overflow: hidden;
+}
+
+h1.animated-title {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid red;
+}
+
+:host {
+    display: block;
+    width: 100%;
+}
+
+.game-bg-anim {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    min-width: 100vw;
+    min-height: 100vh;
+    z-index: 0;
+    background: radial-gradient(circle at 20% 30%, #1976d2 0%, transparent 60%),
+        radial-gradient(circle at 80% 70%, #ffd54f 0%, transparent 60%),
+        linear-gradient(120deg, #232526, #414345 100%);
+    animation: bgmove 10s linear infinite alternate;
+    pointer-events: none;
+}
+
+@keyframes bgmove {
+    0% {
+        background-position: 0% 0%, 100% 100%, 0 0;
+    }
+
+    100% {
+        background-position: 100% 100%, 0% 0%, 100% 100%;
+    }
+}
+
+.game-layout {
+    display: flex;
+    flex-direction: row;
+    min-height: 100vh;
+    width: 100vw;
+    box-sizing: border-box;
+}
+
+.game-main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    width: 100%;
+}
+
+.sidebar {
+    background: rgba(30, 34, 44, 0.98);
+    color: #fff;
+    width: 260px;
+    min-height: 80vh;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(25, 118, 210, 0.10);
+    padding: 2rem 1.2rem 2rem 1.2rem;
+    margin: 2rem 1.5rem 2rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.scoreboard-iframe {
+    width: 100%;
+    height: 60px;
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 1.2rem;
+    background: #212b36;
+    box-shadow: 0 1px 4px rgba(25, 118, 210, 0.10);
+}
+
+.hint-iframe {
+    width: 100%;
+    min-width: 200px;
+    height: 80px;
+    min-height: 60px;
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    background: #263238;
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.12);
+}
+
+.funfact-iframe {
+    width: 100%;
+    min-width: 200px;
+    height: 60px;
+    min-height: 40px;
+    border: none;
+    border-radius: 8px;
+    margin-top: 1.5rem;
+    background: #212b36;
+    box-shadow: 0 1px 4px rgba(25, 118, 210, 0.10);
+}
+
+.game-footer {
+    width: 100vw;
+    text-align: center;
+    color: #1976d2;
+    background: #f5f5f5;
+    padding: 0.7em 0 0.7em 0;
+    font-size: 1em;
+    letter-spacing: 0.04em;
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    z-index: 10;
+    box-shadow: 0 -2px 8px #ccc;
+}
+
+@media (max-width: 900px) {
+    .game-layout {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100vw;
+        min-height: unset;
+        margin: 0 0 1.5rem 0;
+        border-radius: 0 0 16px 16px;
+        padding: 1rem 0.5rem 1rem 0.5rem;
+    }
+
+    .game-main {
+        min-height: unset;
+        padding-bottom: 3em;
+    }
+
+    .game-card {
+        max-width: 98vw;
+        min-height: 60vh;
+        padding: 1.2rem 0.5rem 1.2rem 0.5rem;
+    }
+}
+
+@media (max-width: 700px) {
+    .game-card {
+        max-width: 99vw;
+        min-height: 50vh;
+        padding: 0.7rem 0.2rem 0.7rem 0.2rem;
+    }
+
+    .sidebar {
+        padding: 0.7rem 0.2rem 0.7rem 0.2rem;
+    }
+
+    .game-footer {
+        font-size: 0.9em;
+    }
+}
+
+.game-card {
+    width: 100%;
+    max-width: 700px;
+    min-height: 82vh;
+    margin: 2rem auto;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 8px 32px rgba(25, 118, 210, 0.18), 0 1.5px 8px rgba(0, 0, 0, 0.18);
+    padding: 2.5rem 2.5rem 2rem 2.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    box-sizing: border-box;
+    /* animation: cardfadein 1s cubic-bezier(.68, -0.55, .27, 1.55); */
+    border: 2px dashed red;
+}
+
+@keyframes cardfadein {
+    from {
+        opacity: 0;
+        transform: translateY(40px) scale(1.05);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Remove all animation-related styles */
+.shake,
+.glow,
+.animated-card {
+    animation: none !important;
+}
+
+/* Remove keyframes for shake, glow, cardfadein, confetti-fall, etc. */
+
+#game-title {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    color: #ffd54f;
+    letter-spacing: 0.04em;
+    text-shadow: 0 2px 8px #222;
+}
+
+#level-score {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+}
+
+#sequence {
+    font-size: 1.5rem;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+}
+
+#hint {
+    font-style: italic;
+    color: #b3e5fc;
+    margin-bottom: 1.5rem;
+}
+
+#answer-form {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+#answer-input {
+    flex: 1;
+    padding: 0.5rem;
+    border-radius: 4px;
+    border: none;
+    font-size: 1rem;
+}
+
+#submit-btn,
+#quit-btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    background: #1976d2;
+    color: #fff;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+#quit-btn {
+    background: #d32f2f;
+}
+
+#message {
+    text-align: center;
+    font-size: 1.1rem;
+    margin-top: 1rem;
+    min-height: 2.2em;
+    transition: color 0.3s;
+}
+
+body {
+    overflow-x: hidden;
+}
+
+body,
+.game-layout,
+.game-main,
+.game-card {
+    border: 2px solid red !important;
+}
+
+#game-iframe {
+    width: 100vw;
+    height: 100vh;
+    min-width: 100vw;
+    min-height: 100vh;
+    border: none;
+    margin: 0;
+    padding: 0;
+    display: block;
+}
+
+input[type="text"] {
+    padding: 0.5rem;
+    border-radius: 4px;
+    border: none;
+    font-size: 1rem;
+    margin-right: 0.5rem;
+}
+
+button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    background: #1976d2;
+    color: #fff;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-right: 0.5rem;
+    transition: background 0.2s;
+}
+
+button:hover {
+    background: #1565c0;
+}
+
+button[type="button"] {
+    background: #d32f2f;
+}
+
+button[type="button"]:hover {
+    background: #b71c1c;
+}
+
+@keyframes cardfadein {}
+
+@keyframes shake {}
+
+@keyframes glow {}
+
+@keyframes bgmove {}
+
+.hint-message {
+    font-style: italic;
+    color: #1976d2;
+    margin-bottom: 1.5rem;
+    background: #e3f2fd;
+    padding: 0.5em 1em;
+    border-radius: 8px;
+}
+
+#timer-bar-bg {
+    width: 100%;
+    height: 24px;
+    background: #263238;
+    border-radius: 8px;
+    margin-bottom: 1.1rem;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(25, 118, 210, 0.10);
+    position: relative;
+}
+
+#timer-bar-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #ffd54f, #1976d2);
+    border-radius: 8px;
+    transition: width 0.2s linear;
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+#timer-countdown {
+    position: absolute;
+    right: 16px;
+    top: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    font-weight: bold;
+    color: #1976d2;
+    font-size: 1.1em;
+    z-index: 2;
+}
+
+.sequence-display {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    background: #f0f0f0;
+    color: #111;
+    box-shadow: 0 2px 8px #eee;
+}
+
+.feedback-message {
+    text-align: center;
+    font-size: 1.1rem;
+    margin-top: 1rem;
+    min-height: 2.2em;
+    color: #1976d2;
+}
+
+.score-history {
+    margin-top: 2em;
+    background: #f0f4c3;
+    color: #333;
+    border-radius: 8px;
+    padding: 1em;
+    font-size: 1em;
+}
+
+.score-history h3 {
+    margin-top: 0;
+    color: #1976d2;
+    font-size: 1.1em;
+}
+
+.score-history ul {
+    margin: 0;
+    padding-left: 1.2em;
+}
