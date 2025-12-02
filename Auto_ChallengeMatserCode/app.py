@@ -183,6 +183,7 @@ def get_achievements():
 def get_leaderboard():
     # In a real app, this would fetch from a database
     # For now, return dummy data
+
     return jsonify([
         {'name': 'Alice', 'score': 3200, 'mode': 'classic'},
         {'name': 'Bob', 'score': 2700, 'mode': 'speed'},

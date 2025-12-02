@@ -117,6 +117,7 @@
                         Mode</button>
                     <button id="tutorial-btn" class="secondary-btn">How to Play</button>
                     <button id="settings-btn" class="secondary-btn">Settings</button>
+                    <button id="battle-btn" class="primary-btn" style="margin-top:1em;">Battle Mode</button>
                 </div>
             </div>
         </div>
@@ -199,6 +200,27 @@
                 <span id="step-indicator">1/5</span>
                 <button id="next-step">Next</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Battle Modal -->
+    <div id="battle-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="modal-close" id="close-battle-modal">&times;</span>
+            <h2>Battle Mode</h2>
+            <p>Choose your opponent:</p>
+            <button id="find-player-btn" class="primary-btn">Find Player</button>
+            <button id="play-ai-btn" class="secondary-btn">Play vs Computer</button>
+            <div id="battle-status" style="margin-top:1em;"></div>
+        </div>
+    </div>
+
+    <!-- Fun Fact Modal -->
+    <div id="funfact-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="modal-close" id="close-funfact-modal">&times;</span>
+            <h2>Fun Fact</h2>
+            <div id="funfact-content">Loading...</div>
         </div>
     </div>
 
