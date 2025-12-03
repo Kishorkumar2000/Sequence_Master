@@ -6,6 +6,20 @@
     --text: #ffffff;
     --card-bg: rgba(255, 255, 255, 0.1);
     --glass-border: rgba(255, 255, 255, 0.2);
+    --input-bg: rgba(255, 255, 255, 0.1);
+    --modal-bg: rgba(10, 25, 41, 0.9);
+}
+
+[data-theme="light"] {
+    --primary: #1565c0;
+    --secondary: #c2185b;
+    --accent: #f57f17;
+    --background: #f5f5f5;
+    --text: #212121;
+    --card-bg: rgba(255, 255, 255, 0.9);
+    --glass-border: rgba(0, 0, 0, 0.1);
+    --input-bg: rgba(0, 0, 0, 0.05);
+    --modal-bg: rgba(255, 255, 255, 0.95);
 }
 
 html,
@@ -1168,4 +1182,326 @@ input:checked+.slider:before {
 .username-modal button:hover {
     background: #1565c0;
     transform: translateY(-2px);
+}/* Shop Modal Styles */
+.currency-display {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.currency-display h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: white;
+}
+
+.shop-balance {
+    text-align: center;
+    padding: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.shop-balance h3 {
+    margin: 0;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    padding: 1rem;
+}
+
+.power-up-card {
+    background: var(--card-bg);
+    border: 2px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.power-up-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary);
+    box-shadow: 0 8px 24px rgba(33, 150, 243, 0.3);
+}
+
+.power-up-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.power-up-card h3 {
+    margin: 0.5rem 0;
+    color: var(--primary);
+}
+
+.power-up-card p {
+    color: var(--text);
+    opacity: 0.8;
+    font-size: 0.9rem;
+    margin: 0.5rem 0 1rem 0;
+}
+
+.power-up-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--glass-border);
+}
+
+.power-up-price {
+    font-weight: bold;
+    color: var(--accent);
+}
+
+.buy-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 0.5rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.buy-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.buy-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.power-up-owned {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--accent);
+    font-weight: bold;
+}
+
+/* Power-up activation buttons in game */
+.power-up-controls {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.power-up-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: all 0.3s ease;
+}
+
+.power-up-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.power-up-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.power-up-btn .count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}/* Boss Battle Styles */
+.boss-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #1a0000 0%, #330000 50%, #1a0000 100%);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: bossAppear 0.5s ease-out;
+}
+
+@keyframes bossAppear {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.boss-content {
+    max-width: 800px;
+    width: 90%;
+    padding: 2rem;
+    text-align: center;
+}
+
+.boss-header h1 {
+    font-size: 3rem;
+    color: #ff4444;
+    text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000;
+    margin: 0;
+    animation: bossGlow 1.5s ease-in-out infinite;
+}
+
+@keyframes bossGlow {
+
+    0%,
+    100% {
+        text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000;
+    }
+
+    50% {
+        text-shadow: 0 0 30px #ff0000, 0 0 60px #ff0000, 0 0 80px #ff0000;
+    }
+}
+
+.boss-level {
+    font-size: 1.5rem;
+    color: #ffaa00;
+    margin-top: 0.5rem;
+}
+
+.boss-timer {
+    margin: 2rem 0;
+    position: relative;
+}
+
+.boss-timer-bar {
+    height: 30px;
+    background: linear-gradient(90deg, #ff4444 0%, #ff0000 100%);
+    border-radius: 15px;
+    transition: width 0.1s linear;
+    width: 100%;
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+}
+
+.boss-timer span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 0 10px #000;
+}
+
+.boss-progress {
+    font-size: 1.3rem;
+    color: #ffaa00;
+    margin-bottom: 2rem;
+    font-weight: bold;
+}
+
+.boss-sequence-display {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid #ff4444;
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 2rem 0;
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.3);
+}
+
+.boss-sequence-display #boss-sequence {
+    font-size: 2rem;
+    color: white;
+    margin-bottom: 1rem;
+    font-weight: bold;
+}
+
+.boss-hint {
+    font-size: 1.1rem;
+    color: #ffaa00;
+    font-style: italic;
+}
+
+.boss-answer-form {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin: 2rem 0;
+}
+
+.boss-answer-form input {
+    flex: 1;
+    max-width: 300px;
+    padding: 1rem;
+    font-size: 1.2rem;
+    border: 2px solid #ff4444;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.boss-answer-form button {
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    background: linear-gradient(135deg, #ff4444 0%, #ff0000 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.boss-answer-form button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.6);
+}
+
+.boss-feedback {
+    font-size: 1.3rem;
+    color: white;
+    min-height: 2rem;
+    font-weight: bold;
+}
+
+.boss-victory {
+    animation: victoryPulse 0.5s ease-out;
+}
+
+@keyframes victoryPulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
 }

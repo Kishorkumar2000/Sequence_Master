@@ -1,10 +1,12 @@
 import random
 import time
 import hashlib
+import json
+import os
 from datetime import datetime
 
 class SequenceMasterV2:
-    def __init__(self):
+    def __init__(self, patterns_config=None):
         self.score = 0
         self.level = 1
         self.sequence = []
@@ -13,6 +15,21 @@ class SequenceMasterV2:
         self.custom_seed = None
         self.pattern_history = []
         
+        if patterns_config:
+            self.patterns_config = patterns_config
+        else:
+            # Fallback or load default if not provided
+            self.patterns_config = self._load_default_config()
+
+    def _load_default_config(self):
+        try:
+            config_path = os.path.join(os.path.dirname(__file__), 'config', 'game_config.json')
+            with open(config_path, 'r') as f:
+                return json.load(f)['patterns']
+        except:
+            # Minimal fallback if file missing
+            return {}
+
     def set_seed(self, seed):
         """Set a custom seed for deterministic sequence generation"""
         self.custom_seed = seed
@@ -137,47 +154,22 @@ class SequenceMasterV2:
         
     def get_difficulty_rating(self):
         """Calculate the difficulty rating of the current sequence"""
-        # Base difficulty on pattern type and level
         base_difficulty = self.level * 0.5
-        pattern_difficulty = {
-            0: 1,    # Twisted Arithmetic
-            1: 1.2,  # Mirrored Geometric
-            2: 1.5,  # Wordplay Numbers
-            3: 1.8,  # Fibonacci Twist
-            4: 2,    # Prime Dance
-            5: 1.7,  # Digital Root
-            6: 1.9,  # Binary Pattern
-            7: 2.2   # Chaotic Blend
-        }
-        return base_difficulty * pattern_difficulty[self.pattern_history[-1]]
+        pattern_id = str(self.pattern_history[-1])
+        pattern_data = self.patterns_config.get(pattern_id, {'difficulty': 1.0})
+        return base_difficulty * pattern_data['difficulty']
         
     def get_learning_tip(self):
         """Get a learning tip based on the current pattern"""
-        tips = {
-            0: "Look for arithmetic patterns that alternate between operations.",
-            1: "Practice reading numbers backwards and identifying geometric growth.",
-            2: "Strengthen the connection between numbers and their word representations.",
-            3: "Study the Fibonacci sequence and its variations.",
-            4: "Learn to recognize prime numbers and their patterns.",
-            5: "Practice calculating digital roots of numbers.",
-            6: "Convert numbers to binary and observe patterns.",
-            7: "Break down complex patterns into simpler steps."
-        }
-        return tips[self.pattern_history[-1]]
+        pattern_id = str(self.pattern_history[-1])
+        pattern_data = self.patterns_config.get(pattern_id, {'tip': "Observe the pattern closely."})
+        return pattern_data['tip']
         
     def get_pattern_name(self):
         """Get the name of the current pattern type"""
-        names = {
-            0: "Twisted Arithmetic",
-            1: "Mirrored Geometric",
-            2: "Wordplay Numbers",
-            3: "Fibonacci Twist",
-            4: "Prime Dance",
-            5: "Digital Root",
-            6: "Binary Pattern",
-            7: "Chaotic Blend"
-        }
-        return names[self.pattern_history[-1]]
+        pattern_id = str(self.pattern_history[-1])
+        pattern_data = self.patterns_config.get(pattern_id, {'name': "Unknown Pattern"})
+        return pattern_data['name']
         
     def display_sequence(self):
         """Display sequence and hint"""

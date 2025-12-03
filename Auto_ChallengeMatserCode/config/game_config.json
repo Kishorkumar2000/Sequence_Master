@@ -1,0 +1,98 @@
+{
+    "game_modes": {
+        "classic": {
+            "timer": 20,
+            "score_multiplier": 1
+        },
+        "speed": {
+            "timer": 10,
+            "score_multiplier": 2
+        },
+        "zen": {
+            "timer": null,
+            "score_multiplier": 0.5
+        },
+        "daily": {
+            "timer": 30,
+            "score_multiplier": 3
+        },
+        "code_breaker": {
+            "timer": 25,
+            "score_multiplier": 1.5
+        }
+    },
+    "achievements": {
+        "quick_thinker": {
+            "name": "Quick Thinker",
+            "description": "Complete a level in under 5 seconds",
+            "icon": "⚡"
+        },
+        "perfectionist": {
+            "name": "Perfectionist",
+            "description": "Get 5 correct answers in a row",
+            "icon": "🎯"
+        },
+        "zen_master": {
+            "name": "Zen Master",
+            "description": "Score 1000 points in Zen mode",
+            "icon": "🧘"
+        },
+        "speed_demon": {
+            "name": "Speed Demon",
+            "description": "Score 2000 points in Speed mode",
+            "icon": "🏃"
+        },
+        "daily_warrior": {
+            "name": "Daily Warrior",
+            "description": "Complete 5 daily challenges",
+            "icon": "📅"
+        },
+        "pattern_master": {
+            "name": "Pattern Master",
+            "description": "Solve a level 10 sequence",
+            "icon": "🧩"
+        }
+    },
+    "patterns": {
+        "0": {
+            "name": "Twisted Arithmetic",
+            "difficulty": 1.0,
+            "tip": "Look for arithmetic patterns that alternate between operations."
+        },
+        "1": {
+            "name": "Mirrored Geometric",
+            "difficulty": 1.2,
+            "tip": "Practice reading numbers backwards and identifying geometric growth."
+        },
+        "2": {
+            "name": "Wordplay Numbers",
+            "difficulty": 1.5,
+            "tip": "Strengthen the connection between numbers and their word representations."
+        },
+        "3": {
+            "name": "Fibonacci Twist",
+            "difficulty": 1.8,
+            "tip": "Study the Fibonacci sequence and its variations."
+        },
+        "4": {
+            "name": "Prime Dance",
+            "difficulty": 2.0,
+            "tip": "Learn to recognize prime numbers and their patterns."
+        },
+        "5": {
+            "name": "Digital Root",
+            "difficulty": 1.7,
+            "tip": "Practice calculating digital roots of numbers."
+        },
+        "6": {
+            "name": "Binary Pattern",
+            "difficulty": 1.9,
+            "tip": "Convert numbers to binary and observe patterns."
+        },
+        "7": {
+            "name": "Chaotic Blend",
+            "difficulty": 2.2,
+            "tip": "Break down complex patterns into simpler steps."
+        }
+    }
+}

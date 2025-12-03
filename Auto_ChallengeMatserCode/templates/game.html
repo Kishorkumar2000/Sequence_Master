@@ -11,6 +11,10 @@
     <div class="game-layout">
         <div class="sidebar">
             <h2>Menu</h2>
+            <div class="currency-display">
+                <h3>💎 Bytes: <span id="bytes-count">0</span></h3>
+                <button id="shop-btn" class="primary-btn" style="width: 100%; margin-top: 0.5em;">🛒 Shop</button>
+            </div>
             <div>
                 <h3>How to Play</h3>
                 <ul>
@@ -25,10 +29,8 @@
             </div>
             <div>
                 <h3>Leaderboard</h3>
-                <ol>
-                    <li>Alice - 3200</li>
-                    <li>Bob - 2700</li>
-                    <li>Charlie - 2100</li>
+                <ol id="leaderboard-list">
+                    <li>Loading...</li>
                 </ol>
             </div>
             <div id="score-history" class="score-history">
@@ -55,10 +57,23 @@
                 <form class="answer-form" id="answer-form">
                     <input type="text" id="answer-input" placeholder="Enter your answer" autocomplete="off" required>
                     <button type="submit" id="submit-btn">Submit</button>
-                    <button type="button" id="quit-btn">Quit</button>
                 </form>
+                <div class="power-up-controls" id="power-up-controls">
+                    <button class="power-up-btn" id="use-time-freeze" disabled>
+                        ⏱️ Time Freeze <span class="count">0</span>
+                    </button>
+                    <button class="power-up-btn" id="use-debugger" disabled>
+                        🔍 Debugger <span class="count">0</span>
+                    </button>
+                    <button class="power-up-btn" id="use-skip" disabled>
+                        ⏭️ Skip <span class="count">0</span>
+                    </button>
+                </div>
+                <div class="controls" style="margin-top: 10px;">
+                    <button type="button" id="quit-btn" onclick="quitGame()">Quit</button>
+                    <button id="restart-btn" style="display:none;">Restart Game</button>
+                </div>
                 <div class="feedback-message" id="feedback-message">Feedback will appear here.</div>
-                <button id="restart-btn" style="display:none; margin-top:1em;">Restart Game</button>
                 <iframe id="funfact-iframe" src="{{ url_for('static', filename='funfact.html') }}"
                     class="funfact-iframe"></iframe>
             </div>
@@ -98,6 +113,14 @@
                             <div class="mode-stats">
                                 <span>Streak: <span id="daily-streak">0</span></span>
                                 <span>Completed: <span id="daily-completed">No</span></span>
+                            </div>
+                        </div>
+                        <div class="mode-card" data-mode="code_breaker" tabindex="0" role="button">
+                            <h3>🎨 Code Breaker</h3>
+                            <p>Visual & logic patterns - not just numbers!</p>
+                            <div class="mode-stats">
+                                <span>Best Score: <span id="code_breaker-best">0</span></span>
+                                <span>Games: <span id="code_breaker-games">0</span></span>
                             </div>
                         </div>
                     </div>
@@ -221,6 +244,77 @@
             <span class="modal-close" id="close-funfact-modal">&times;</span>
             <h2>Fun Fact</h2>
             <div id="funfact-content">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Shop Modal -->
+    <div id="shop-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>💎 Power-Up Shop</h2>
+                <button class="modal-close" id="close-shop-modal">&times;</button>
+            </div>
+            <div class="shop-balance">
+                <h3>Your Bytes: <span id="shop-bytes">0</span></h3>
+            </div>
+            <div class="shop-grid">
+                <div class="power-up-card" data-powerup="time_freeze">
+                    <div class="power-up-icon">⏱️</div>
+                    <h3>Time Freeze</h3>
+                    <p>Add 10 seconds to the timer</p>
+                    <div class="power-up-footer">
+                        <span class="power-up-price">50 Bytes</span>
+                        <button class="buy-btn" data-powerup="time_freeze">Buy</button>
+                    </div>
+                    <div class="power-up-owned">Owned: <span class="owned-count">0</span></div>
+                </div>
+                <div class="power-up-card" data-powerup="debugger">
+                    <div class="power-up-icon">🔍</div>
+                    <h3>Debugger</h3>
+                    <p>Reveal one digit of the answer</p>
+                    <div class="power-up-footer">
+                        <span class="power-up-price">75 Bytes</span>
+                        <button class="buy-btn" data-powerup="debugger">Buy</button>
+                    </div>
+                    <div class="power-up-owned">Owned: <span class="owned-count">0</span></div>
+                </div>
+                <div class="power-up-card" data-powerup="skip">
+                    <div class="power-up-icon">⏭️</div>
+                    <h3>Skip</h3>
+                    <p>Skip this level without penalty</p>
+                    <div class="power-up-footer">
+                        <span class="power-up-price">100 Bytes</span>
+                        <button class="buy-btn" data-powerup="skip">Buy</button>
+                    </div>
+                    <div class="power-up-owned">Owned: <span class="owned-count">0</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Boss Battle Overlay -->
+    <div id="boss-overlay" class="boss-overlay" style="display:none;">
+        <div class="boss-content">
+            <div class="boss-header">
+                <h1>🔥 BOSS BATTLE 🔥</h1>
+                <div class="boss-level">Level <span id="boss-level-num">5</span></div>
+            </div>
+            <div class="boss-timer">
+                <div class="boss-timer-bar" id="boss-timer-bar"></div>
+                <span id="boss-timer-text">30</span>s
+            </div>
+            <div class="boss-progress">
+                <span id="boss-progress-text">0/3</span> Sequences Completed
+            </div>
+            <div class="boss-sequence-display">
+                <div id="boss-sequence"></div>
+                <div id="boss-hint" class="boss-hint"></div>
+            </div>
+            <form id="boss-answer-form" class="boss-answer-form">
+                <input type="text" id="boss-answer-input" placeholder="Enter answer" autocomplete="off" required>
+                <button type="submit" id="boss-submit-btn">Submit</button>
+            </form>
+            <div id="boss-feedback" class="boss-feedback"></div>
         </div>
     </div>
 

@@ -1,30 +1,51 @@
 from flask import Flask, render_template, jsonify, request, session
 from sequenceMaster import SequenceMasterV2
+from codeBreakerPatterns import CodeBreakerPatterns
 from datetime import datetime, timedelta
 import json
 import os
 import hashlib
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+# Use a constant secret key for development to persist sessions across restarts
+app.secret_key = 'dev-secret-key-sequence-master'
 
-# Game modes configuration
-GAME_MODES = {
-    'classic': {'timer': 20, 'score_multiplier': 1},
-    'speed': {'timer': 10, 'score_multiplier': 2},
-    'zen': {'timer': None, 'score_multiplier': 0.5},
-    'daily': {'timer': 30, 'score_multiplier': 3}
-}
+# Load configuration
+def load_config():
+    config_path = os.path.join(os.path.dirname(__file__), 'config', 'game_config.json')
+    with open(config_path, 'r') as f:
+        return json.load(f)
 
-# Achievement definitions
-ACHIEVEMENTS = {
-    'quick_thinker': {'name': 'Quick Thinker', 'description': 'Complete a level in under 5 seconds', 'icon': '⚡'},
-    'perfectionist': {'name': 'Perfectionist', 'description': 'Get 5 correct answers in a row', 'icon': '🎯'},
-    'zen_master': {'name': 'Zen Master', 'description': 'Score 1000 points in Zen mode', 'icon': '🧘'},
-    'speed_demon': {'name': 'Speed Demon', 'description': 'Score 2000 points in Speed mode', 'icon': '🏃'},
-    'daily_warrior': {'name': 'Daily Warrior', 'description': 'Complete 5 daily challenges', 'icon': '📅'},
-    'pattern_master': {'name': 'Pattern Master', 'description': 'Solve a level 10 sequence', 'icon': '🧩'}
-}
+CONFIG = load_config()
+GAME_MODES = CONFIG['game_modes']
+ACHIEVEMENTS = CONFIG['achievements']
+
+# Leaderboard functions
+def load_leaderboard():
+    data_path = os.path.join(os.path.dirname(__file__), 'data', 'leaderboard.json')
+    try:
+        with open(data_path, 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+def save_leaderboard(leaderboard_data):
+    data_path = os.path.join(os.path.dirname(__file__), 'data', 'leaderboard.json')
+    with open(data_path, 'w') as f:
+        json.dump(leaderboard_data, f, indent=4)
+
+def update_leaderboard(name, score, mode):
+    leaderboard = load_leaderboard()
+    leaderboard.append({
+        'name': name,
+        'score': score,
+        'mode': mode,
+        'date': datetime.now().strftime('%Y-%m-%d %H:%M')
+    })
+    # Sort by score descending and keep top 50
+    leaderboard.sort(key=lambda x: x['score'], reverse=True)
+    leaderboard = leaderboard[:50]
+    save_leaderboard(leaderboard)
 
 def get_daily_challenge():
     """Generate a consistent daily challenge based on the date"""
@@ -59,12 +80,44 @@ def get_challenge():
     mode = session.get('game_mode', 'classic')
     if mode == 'daily' and session.get('daily_completed'):
         return jsonify({'error': 'Daily challenge already completed'}), 400
+    
+    current_level = session.get('level', 1)
+    
+    # Check if this is a boss level (every 5 levels)
+    is_boss = current_level % 5 == 0 and current_level > 0
+    
+    if is_boss:
+        return jsonify({
+            'is_boss': True,
+            'level': current_level,
+            'message': f'🔥 BOSS BATTLE - Level {current_level}! Complete 3 sequences in 30 seconds!'
+        })
+    
+    # Code Breaker mode uses different patterns
+    if mode == 'code_breaker':
+        pattern_data = CodeBreakerPatterns.generate_pattern(current_level)
+        
+        session['last_sequence'] = pattern_data['sequence']
+        session['correct_answer'] = pattern_data['answer']
+        session['pattern_type'] = pattern_data['type']
+        session['start_time'] = datetime.now().timestamp()
+        
+        return jsonify({
+            'sequence': pattern_data['sequence'],
+            'hint': pattern_data['hint'],
+            'level': current_level,
+            'score': session.get('score', 0),
+            'timer': GAME_MODES[mode]['timer'],
+            'mode': mode,
+            'is_boss': False,
+            'pattern_type': pattern_data['type']
+        })
         
     game = SequenceMasterV2()
     if mode == 'daily':
         game.set_seed(get_daily_challenge())
     
-    game.level = session.get('level', 1)
+    game.level = current_level
     game.score = session.get('score', 0)
     game.generate_sequence()
     
@@ -78,8 +131,103 @@ def get_challenge():
         'level': game.level,
         'score': game.score,
         'timer': GAME_MODES[mode]['timer'],
-        'mode': mode
+        'mode': mode,
+        'is_boss': False
     })
+
+@app.route('/api/boss/start', methods=['POST'])
+def start_boss():
+    """Generate 3 sequences for boss battle"""
+    mode = session.get('game_mode', 'classic')
+    current_level = session.get('level', 1)
+    
+    sequences = []
+    for i in range(3):
+        game = SequenceMasterV2()
+        game.level = current_level
+        game.score = session.get('score', 0)
+        game.generate_sequence()
+        
+        sequences.append({
+            'sequence': game.sequence,
+            'hint': game.hint,
+            'correct_answer': game.correct_answer
+        })
+    
+    # Store boss data in session
+    session['boss_sequences'] = sequences
+    session['boss_current'] = 0
+    session['boss_start_time'] = datetime.now().timestamp()
+    
+    return jsonify({
+        'sequences': sequences,
+        'total_time': 30,
+        'level': current_level
+    })
+
+@app.route('/api/boss/answer', methods=['POST'])
+def check_boss_answer():
+    """Check answer for current boss sequence"""
+    data = request.get_json()
+    answer = data.get('answer')
+    
+    try:
+        answer = int(answer)
+    except ValueError:
+        return jsonify({'error': 'Invalid answer format'}), 400
+    
+    boss_sequences = session.get('boss_sequences', [])
+    boss_current = session.get('boss_current', 0)
+    
+    if boss_current >= len(boss_sequences):
+        return jsonify({'error': 'No active boss sequence'}), 400
+    
+    correct_answer = boss_sequences[boss_current]['correct_answer']
+    is_correct = answer == correct_answer
+    
+    if is_correct:
+        session['boss_current'] = boss_current + 1
+        
+        # Check if boss is defeated
+        if session['boss_current'] >= 3:
+            # Boss defeated! Award bonus
+            bonus_bytes = 100
+            session['bytes'] = session.get('bytes', 0) + bonus_bytes
+            session['score'] = session.get('score', 0) + 500
+            session['level'] = session.get('level', 1) + 1
+            
+            # Clear boss data
+            session.pop('boss_sequences', None)
+            session.pop('boss_current', None)
+            session.pop('boss_start_time', None)
+            
+            return jsonify({
+                'correct': True,
+                'boss_defeated': True,
+                'bonus_bytes': bonus_bytes,
+                'message': '🎉 BOSS DEFEATED! +500 points, +100 bytes!',
+                'new_level': session['level']
+            })
+        else:
+            return jsonify({
+                'correct': True,
+                'boss_defeated': False,
+                'progress': f"{session['boss_current']}/3",
+                'message': f'Correct! {3 - session["boss_current"]} more to go!'
+            })
+    else:
+        # Boss battle failed
+        session.pop('boss_sequences', None)
+        session.pop('boss_current', None)
+        session.pop('boss_start_time', None)
+        
+        return jsonify({
+            'correct': False,
+            'boss_defeated': False,
+            'game_over': True,
+            'correct_answer': correct_answer,
+            'message': 'Boss Battle Failed! Game Over.'
+        })
 
 @app.route('/api/answer', methods=['POST'])
 def check_answer():
@@ -89,15 +237,25 @@ def check_answer():
     
     if not answer:
         return jsonify({'error': 'No answer provided'}), 400
-        
-    try:
-        answer = int(answer)
-    except ValueError:
-        return jsonify({'error': 'Invalid answer format'}), 400
-        
+    
+    # Get correct answer and pattern type
     correct_answer = session.get('correct_answer')
+    pattern_type = session.get('pattern_type', 'numeric')
+    
     if correct_answer is None:
         return jsonify({'error': 'No active challenge'}), 400
+    
+    # Handle different answer types based on pattern
+    if pattern_type in ['color', 'keyboard']:
+        # String comparison (case-insensitive)
+        is_correct = str(answer).strip().lower() == str(correct_answer).strip().lower()
+    else:
+        # Numeric comparison
+        try:
+            answer = int(answer)
+            is_correct = answer == correct_answer
+        except ValueError:
+            return jsonify({'error': 'Invalid answer format'}), 400
         
     # Calculate time taken
     start_time = session.get('start_time')
@@ -105,7 +263,7 @@ def check_answer():
     
     # Update user stats
     user_stats = session.get('user_stats', {})
-    if answer == correct_answer:
+    if is_correct:
         # Calculate score based on time and mode
         time_bonus = int(200 / (time_taken + 1)) if mode != 'zen' else 100
         score_gain = time_bonus * session.get('level', 1) * GAME_MODES[mode]['score_multiplier']
@@ -115,6 +273,14 @@ def check_answer():
         
         session['score'] = new_score
         session['level'] = new_level
+        
+        # Award currency (Bytes)
+        bytes_earned = 10  # 10 bytes per correct answer
+        session['bytes'] = session.get('bytes', 0) + bytes_earned
+        
+        # Initialize power-ups if not exists
+        if 'power_ups' not in session:
+            session['power_ups'] = {'time_freeze': 0, 'debugger': 0, 'skip': 0}
         
         # Update stats
         user_stats['games_played'] = user_stats.get('games_played', 0) + 1
@@ -139,16 +305,94 @@ def check_answer():
         return jsonify({
             'message': f'Correct! Score: {new_score}',
             'game_over': False,
-            'new_achievements': new_achievements
+            'new_achievements': new_achievements,
+            'bytes': session['bytes'],
+            'power_ups': session['power_ups']
         })
     else:
         user_stats['current_streak'] = 0
         session['user_stats'] = user_stats
+        
+        # Save score to leaderboard if it's significant (e.g., > 0)
+        final_score = session.get("score", 0)
+        if final_score > 0:
+            # For now, we use a placeholder name or the one from session if we had it
+            # In a real flow, we'd ask for name after game over. 
+            # For this iteration, let's assume we might get a name in the request or default to 'Anonymous'
+            # But the current UI flow asks for name at start or end. 
+            # Let's add a separate endpoint to submit score or handle it here if name provided.
+            pass 
+
         return jsonify({
-            'message': f'Game Over! Final Score: {session.get("score", 0)}',
+            'message': f'Game Over! Final Score: {final_score}',
             'game_over': True,
             'correct_answer': correct_answer
         })
+
+@app.route('/api/reset', methods=['POST'])
+def reset_game():
+    session['score'] = 0
+    session['level'] = 1
+    session.pop('last_sequence', None)
+    session.pop('correct_answer', None)
+    return jsonify({'status': 'success', 'message': 'Game reset'})
+
+@app.route('/api/shop/purchase', methods=['POST'])
+def purchase_power_up():
+    data = request.get_json()
+    power_up = data.get('power_up')
+    
+    # Power-up prices
+    prices = {
+        'time_freeze': 50,
+        'debugger': 75,
+        'skip': 100
+    }
+    
+    if power_up not in prices:
+        return jsonify({'error': 'Invalid power-up'}), 400
+    
+    price = prices[power_up]
+    current_bytes = session.get('bytes', 0)
+    
+    if current_bytes < price:
+        return jsonify({'error': 'Not enough bytes'}), 400
+    
+    # Deduct bytes and add power-up
+    session['bytes'] = current_bytes - price
+    if 'power_ups' not in session:
+        session['power_ups'] = {'time_freeze': 0, 'debugger': 0, 'skip': 0}
+    session['power_ups'][power_up] = session['power_ups'].get(power_up, 0) + 1
+    
+    return jsonify({
+        'status': 'success',
+        'bytes': session['bytes'],
+        'power_ups': session['power_ups']
+    })
+
+@app.route('/api/shop/status', methods=['GET'])
+def shop_status():
+    if 'bytes' not in session:
+        session['bytes'] = 0
+    if 'power_ups' not in session:
+        session['power_ups'] = {'time_freeze': 0, 'debugger': 0, 'skip': 0}
+    
+    return jsonify({
+        'bytes': session['bytes'],
+        'power_ups': session['power_ups']
+    })
+
+@app.route('/api/submit_score', methods=['POST'])
+def submit_score():
+    data = request.get_json()
+    name = data.get('name', 'Anonymous')
+    score = session.get('score', 0)
+    mode = session.get('game_mode', 'classic')
+    
+    if score > 0:
+        update_leaderboard(name, score, mode)
+        
+    return jsonify({'status': 'success'})
 
 @app.route('/api/stats')
 def get_stats():
@@ -181,19 +425,22 @@ def get_achievements():
 
 @app.route('/api/leaderboard')
 def get_leaderboard():
-    # In a real app, this would fetch from a database
-    # For now, return dummy data
-
-    return jsonify([
-        {'name': 'Alice', 'score': 3200, 'mode': 'classic'},
-        {'name': 'Bob', 'score': 2700, 'mode': 'speed'},
-        {'name': 'Charlie', 'score': 2100, 'mode': 'zen'}
-    ])
+    return jsonify(load_leaderboard())
 
 @app.route('/api/last_answer')
 def get_last_answer():
     return jsonify({
         'last_answer': session.get('correct_answer')
+    })
+
+@app.route('/api/battle/start', methods=['POST'])
+def start_battle():
+    # Placeholder for Battle Mode
+    # In a real implementation, this would match players or start a bot game
+    return jsonify({
+        'status': 'started',
+        'opponent': 'SequenceBot 3000',
+        'message': 'Battle started! Solve sequences faster than the bot!'
     })
 
 if __name__ == '__main__':

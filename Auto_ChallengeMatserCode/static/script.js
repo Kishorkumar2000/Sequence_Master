@@ -169,16 +169,22 @@ document.addEventListener("DOMContentLoaded", () => {
     speed: { timer: 10, multiplier: 2 },
     zen: { timer: null, multiplier: 0.5 },
     daily: { timer: 30, multiplier: 3 },
+    classic: { name: "Classic Mode", timer: 20, description: "Original sequence challenge" },
+    speed: { name: "Speed Mode", timer: 10, description: "10s timer but 2x points!" },
+    zen: { name: "Zen Mode", timer: 0, description: "No timer, complex patterns" },
+    daily: { name: "Daily Challenge", timer: 30, description: "One attempt at today's sequence" },
+    code_breaker: { name: "Code Breaker", timer: 25, description: "Visual & logic patterns!" }
   };
 
   // Achievement configuration
+  // Achievement configuration
   const ACHIEVEMENTS = {
-    quickThinker: { name: "Quick Thinker", description: "Complete a level in under 5 seconds", icon: "⚡" },
+    quick_thinker: { name: "Quick Thinker", description: "Complete a level in under 5 seconds", icon: "⚡" },
     perfectionist: { name: "Perfectionist", description: "Get 5 correct answers in a row", icon: "🎯" },
-    zenMaster: { name: "Zen Master", description: "Score 1000 points in Zen mode", icon: "🧘" },
-    speedDemon: { name: "Speed Demon", description: "Score 2000 points in Speed mode", icon: "🏃" },
-    dailyWarrior: { name: "Daily Warrior", description: "Complete 5 daily challenges", icon: "📅" },
-    patternMaster: { name: "Pattern Master", description: "Solve a level 10 sequence", icon: "🧩" },
+    zen_master: { name: "Zen Master", description: "Score 1000 points in Zen mode", icon: "🧘" },
+    speed_demon: { name: "Speed Demon", description: "Score 2000 points in Speed mode", icon: "🏃" },
+    daily_warrior: { name: "Daily Warrior", description: "Complete 5 daily challenges", icon: "📅" },
+    pattern_master: { name: "Pattern Master", description: "Solve a level 10 sequence", icon: "🧩" },
   };
 
   // Tutorial system
@@ -211,16 +217,68 @@ document.addEventListener("DOMContentLoaded", () => {
     },
   ];
 
-  // Sound system
-  const SOUNDS = {};
+  // Sound system using Web Audio API
+  const Synth = {
+    ctx: null,
+    init: function () {
+      if (!this.ctx) {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    },
+    playTone: function (freq, type, duration, vol = 0.1) {
+      this.init();
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+      gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start();
+      osc.stop(this.ctx.currentTime + duration);
+    },
+    playCorrect: function () {
+      this.playTone(600, 'sine', 0.1, 0.1);
+      setTimeout(() => this.playTone(800, 'sine', 0.2, 0.1), 100);
+    },
+    playWrong: function () {
+      this.playTone(150, 'sawtooth', 0.3, 0.1);
+    },
+    playWarning: function () {
+      this.playTone(400, 'square', 0.1, 0.05);
+    },
+    playTimeout: function () {
+      this.playTone(200, 'sawtooth', 0.5, 0.1);
+      setTimeout(() => this.playTone(150, 'sawtooth', 0.5, 0.1), 200);
+    },
+    playAchievement: function () {
+      [400, 500, 600, 800].forEach((freq, i) => {
+        setTimeout(() => this.playTone(freq, 'triangle', 0.2, 0.1), i * 100);
+      });
+    }
+  };
 
   function initSounds() {
-    const soundFiles = ["correct", "wrong", "warning", "timeout", "achievement"];
-    soundFiles.forEach((sound) => {
-      const audio = new Audio(`/static/sounds/${sound}.mp3`);
-      audio.onerror = () => console.log(`Failed to load sound: ${sound}`);
-      SOUNDS[sound] = audio;
-    });
+    // Initialize audio context on first user interaction to comply with browser policies
+    document.addEventListener('click', () => Synth.init(), { once: true });
+    document.addEventListener('keydown', () => Synth.init(), { once: true });
+  }
+
+  function playSound(soundName) {
+    if (localStorage.getItem("soundEnabled") === "false") return;
+
+    switch (soundName) {
+      case 'correct': Synth.playCorrect(); break;
+      case 'wrong': Synth.playWrong(); break;
+      case 'warning': Synth.playWarning(); break;
+      case 'timeout': Synth.playTimeout(); break;
+      case 'achievement': Synth.playAchievement(); break;
+    }
   }
 
   function setHint(hint) {
@@ -316,52 +374,77 @@ document.addEventListener("DOMContentLoaded", () => {
       .then((res) => res.json())
       .then((data) => {
         console.log("Challenge data:", data);
-        // Update sequence display
-        seqDisplay.textContent = data.sequence.join(" ");
-        // Update level and score display
-        document.getElementById("level-score").textContent = `Level ${data.level} - Score: ${data.score}`;
-        document.getElementById("hint-message").textContent = data.hint;
-        setScoreboard(data.level, data.score);
-        setFeedback("");
 
-        // Reset and re-enable all game elements
-        const answerInput = document.getElementById("answer-input");
-        const submitBtn = document.getElementById("submit-btn");
-        const quitBtn = document.getElementById("quit-btn");
-        const restartBtn = document.getElementById("restart-btn");
-
-        // Re-enable input and buttons
-        answerInput.disabled = false;
-        answerInput.value = "";
-        submitBtn.disabled = false;
-        quitBtn.disabled = false;
-        restartBtn.style.display = "none";
-
-        gameOver = false;
-
-        // Update timer based on game mode
-        if (data.mode) {
-          selectedMode = data.mode;
-          timerDuration = GAME_MODES[data.mode].timer;
+        // Check if this is a boss battle
+        if (data.is_boss) {
+          startBossBattle(data.level);
+          return;
         }
 
-        startTimer(() => {
-          fetch("/api/last_answer")
-            .then((res) => res.json())
-            .then((data) => {
-              let answerMsg =
-                data.last_answer !== null
-                  ? `⏰ Time is up! Game Over. The correct answer was: <b>${data.last_answer}</b>`
-                  : "⏰ Time is up! Game Over.";
-              document.getElementById("feedback-message").innerHTML = answerMsg;
-              let score = 0;
-              const scoreText = document.getElementById("level-score").textContent;
-              if (scoreText.match(/Score: (\d+)/)) {
-                score = parseInt(scoreText.match(/Score: (\d+)/)[1]);
-              }
-              disableGame(score);
-            });
-        });
+        try {
+          // Update sequence display
+          if (seqDisplay) seqDisplay.textContent = data.sequence ? data.sequence.join(" ") : "";
+
+          // Update level and score display
+          const levelScoreEl = document.getElementById("level-score");
+          if (levelScoreEl) levelScoreEl.textContent = `Level ${data.level} - Score: ${data.score}`;
+
+          const hintMsgEl = document.getElementById("hint-message");
+          if (hintMsgEl) hintMsgEl.textContent = data.hint || "";
+
+          setScoreboard(data.level, data.score);
+          setFeedback("");
+
+          // Reset and re-enable all game elements
+          const answerInput = document.getElementById("answer-input");
+          const submitBtn = document.getElementById("submit-btn");
+          const quitBtn = document.getElementById("quit-btn");
+          const restartBtn = document.getElementById("restart-btn");
+
+          console.log("Enabling buttons...", { answerInput, submitBtn, quitBtn });
+
+          // Re-enable input and buttons
+          if (answerInput) {
+            answerInput.disabled = false;
+            answerInput.value = "";
+            answerInput.focus();
+          }
+          if (submitBtn) submitBtn.disabled = false;
+          if (quitBtn) {
+            quitBtn.disabled = false;
+            console.log("Quit button enabled");
+          }
+          if (restartBtn) restartBtn.style.display = "none";
+
+          gameOver = false;
+
+          // Update timer based on game mode
+          if (data.mode) {
+            selectedMode = data.mode;
+            timerDuration = GAME_MODES[data.mode].timer;
+          }
+
+          startTimer(() => {
+            fetch("/api/last_answer")
+              .then((res) => res.json())
+              .then((data) => {
+                let answerMsg =
+                  data.last_answer !== null
+                    ? `⏰ Time is up! Game Over. The correct answer was: <b>${data.last_answer}</b>`
+                    : "⏰ Time is up! Game Over.";
+                const feedbackEl = document.getElementById("feedback-message");
+                if (feedbackEl) feedbackEl.innerHTML = answerMsg;
+
+                let score = 0;
+                if (levelScoreEl && levelScoreEl.textContent.match(/Score: (\d+)/)) {
+                  score = parseInt(levelScoreEl.textContent.match(/Score: (\d+)/)[1]);
+                }
+                disableGame(score);
+              });
+          });
+        } catch (err) {
+          console.error("Error updating UI in loadChallenge:", err);
+        }
       })
       .catch((error) => {
         console.error("Error loading challenge:", error);
@@ -372,10 +455,13 @@ document.addEventListener("DOMContentLoaded", () => {
   function disableGame(finalScore) {
     document.getElementById("answer-input").disabled = true;
     document.getElementById("submit-btn").disabled = true;
-    document.getElementById("quit-btn").disabled = true;
+    // document.getElementById("quit-btn").disabled = true; // Kept enabled so user can quit
     document.getElementById("restart-btn").style.display = "inline-block";
     stopTimer();
+
+    if (gameOver) return; // Prevent double score saving
     gameOver = true;
+
     if (typeof finalScore === "number") {
       saveScore(finalScore, selectedMode);
       showScoreHistory();
@@ -407,6 +493,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function saveScore(score, mode = "classic") {
     let username = localStorage.getItem("username") || "Player";
+
+    // Submit to backend
+    fetch("/api/submit_score", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: username,
+        score: score,
+        mode: mode
+      })
+    })
+      .then(response => response.json())
+      .then(data => {
+        console.log("Score submitted:", data);
+        updateLeaderboard(); // Refresh leaderboard
+      })
+      .catch(error => console.error("Error submitting score:", error));
+
+    // Keep local storage logic for offline/history backup if desired, 
+    // but primarily rely on backend for leaderboard.
+    // ... (keeping existing local storage logic for personal history)
     let scores = JSON.parse(localStorage.getItem("scoreHistory") || "[]");
 
     // Add new score to history
@@ -446,6 +555,27 @@ document.addEventListener("DOMContentLoaded", () => {
     updateStatsDisplay();
   }
 
+  function updateLeaderboard() {
+    fetch("/api/leaderboard")
+      .then(res => res.json())
+      .then(data => {
+        const list = document.getElementById("leaderboard-list");
+        if (list) {
+          if (data.length === 0) {
+            list.innerHTML = "<li>No scores yet</li>";
+          } else {
+            list.innerHTML = data.slice(0, 10).map(entry =>
+              `<li>${entry.name} - ${entry.score} <span style="font-size:0.8em;color:#888">(${entry.mode})</span></li>`
+            ).join("");
+          }
+        }
+      })
+      .catch(err => console.error("Error fetching leaderboard:", err));
+  }
+
+  // Call updateLeaderboard on load
+  updateLeaderboard();
+
   function showScoreHistory() {
     const recentScoresList = document.getElementById("recent-scores-list");
     const scores = JSON.parse(localStorage.getItem("scoreHistory") || "[]");
@@ -477,17 +607,17 @@ document.addEventListener("DOMContentLoaded", () => {
     let newAchievements = [];
 
     // Check each achievement condition
-    if (!achievements.includes("quickThinker") && document.getElementById("timer-countdown").textContent > 15) {
-      newAchievements.push("quickThinker");
+    if (!achievements.includes("quick_thinker") && document.getElementById("timer-countdown").textContent > 15) {
+      newAchievements.push("quick_thinker");
     }
 
     let stats = JSON.parse(localStorage.getItem("modeStats") || "{}");
-    if (!achievements.includes("zenMaster") && stats.zen?.bestScore >= 1000) {
-      newAchievements.push("zenMaster");
+    if (!achievements.includes("zen_master") && stats.zen?.bestScore >= 1000) {
+      newAchievements.push("zen_master");
     }
 
-    if (!achievements.includes("speedDemon") && stats.speed?.bestScore >= 2000) {
-      newAchievements.push("speedDemon");
+    if (!achievements.includes("speed_demon") && stats.speed?.bestScore >= 2000) {
+      newAchievements.push("speed_demon");
     }
 
     // Add new achievements
@@ -553,10 +683,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function playSound(soundName) {
-    if (localStorage.getItem("soundEnabled") === "true" && SOUNDS[soundName]) {
-      SOUNDS[soundName].play().catch(() => {
-        console.log("Sound playback failed or was interrupted");
-      });
+    if (localStorage.getItem("soundEnabled") === "false") return;
+
+    switch (soundName) {
+      case 'correct': Synth.playCorrect(); break;
+      case 'wrong': Synth.playWrong(); break;
+      case 'warning': Synth.playWarning(); break;
+      case 'timeout': Synth.playTimeout(); break;
+      case 'achievement': Synth.playAchievement(); break;
     }
   }
 
@@ -585,13 +719,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   document.getElementById("restart-btn").addEventListener("click", function () {
-    this.style.display = "none";
-    document.getElementById("feedback-message").textContent = "";
-    document.getElementById("game-card").style.display = "block";
-    loadChallenge();
+    const btn = this;
+    btn.disabled = true;
+    fetch('/api/reset', { method: 'POST' })
+      .then(() => {
+        btn.style.display = "none";
+        btn.disabled = false;
+        document.getElementById("feedback-message").textContent = "";
+        document.getElementById("game-card").style.display = "block";
+        loadChallenge();
+      });
   });
 
   document.addEventListener("DOMContentLoaded", function () {
+    initSounds();
     showScoreHistory();
     updateStatsDisplay();
     updateAchievementDisplay();
@@ -796,41 +937,83 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // --- Quit Button Handler ---
-  const quitBtn = document.getElementById("quit-btn");
-  if (quitBtn) {
-    quitBtn.addEventListener("click", function () {
-      stopTimer();
-      setFeedback("Game Over!");
-      disableGame(extractScoreFromMessage(document.getElementById("level-score").textContent));
-      document.getElementById("game-card").style.display = "none";
-      document.getElementById("start-screen").style.display = "flex";
-      showScoreHistory();
-      updateStatsDisplay();
-    });
-  }
+  // --- Quit Button Handler (Global) ---
+  window.quitGame = function () {
+    console.log("Quit button clicked (global function)");
+    stopTimer();
+    setFeedback("Game Over!");
+    const scoreEl = document.getElementById("level-score");
+    const score = scoreEl ? extractScoreFromMessage(scoreEl.textContent) : 0;
+
+    console.log("Calling disableGame...");
+    disableGame(score);
+    console.log("disableGame returned. Hiding game card...");
+
+    const gameCard = document.getElementById("game-card");
+    const startScreen = document.getElementById("start-screen");
+
+    if (gameCard) gameCard.style.display = "none";
+    else console.error("Could not find game-card element");
+
+    if (startScreen) startScreen.style.display = "flex";
+    else console.error("Could not find start-screen element");
+
+    console.log("UI updated. Showing history...");
+    showScoreHistory();
+    updateStatsDisplay();
+  };
 
   // --- Answer Form Submit Handler ---
   if (answerFormEl) {
     answerFormEl.addEventListener("submit", function (event) {
       event.preventDefault();
-      if (gameOver) return;
+      if (gameOver && !isBattleMode) return;
+
       const answerInput = document.getElementById("answer-input");
       const answer = answerInput.value.trim();
       if (!answer) return;
+
       document.getElementById("submit-btn").disabled = true;
       setFeedback("Checking answer...");
+
       fetch("/api/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answer }),
       })
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error("Network response was not ok");
+          return res.json();
+        })
         .then((data) => {
           if (data.error) {
             setFeedback(data.error);
             document.getElementById("submit-btn").disabled = false;
             return;
           }
+
+          // Battle Mode Logic
+          if (isBattleMode) {
+            if (data.game_over) {
+              setFeedback(data.message);
+              playSound("wrong");
+              document.getElementById("game-card").classList.add("shake");
+            } else {
+              setFeedback(data.message);
+              playSound("correct");
+              confetti();
+              document.getElementById("game-card").classList.add("glow");
+              setTimeout(() => document.getElementById("game-card").classList.remove("glow"), 800);
+              battlePlayerScore += 100 + Math.floor(Math.random() * 100);
+            }
+            // Always go to next round in battle mode
+            setTimeout(() => {
+              nextBattleRound();
+            }, 1200);
+            return;
+          }
+
+          // Normal Mode Logic
           if (data.game_over) {
             setFeedback(data.message);
             playSound("wrong");
@@ -847,11 +1030,23 @@ document.addEventListener("DOMContentLoaded", () => {
             confetti();
             document.getElementById("game-card").classList.add("glow");
             setTimeout(() => document.getElementById("game-card").classList.remove("glow"), 800);
+
+            // Update bytes and power-ups if returned
+            if (data.bytes !== undefined) {
+              currentBytes = data.bytes;
+              currentPowerUps = data.power_ups || currentPowerUps;
+              updateShopUI();
+            }
+
             // Show new achievements
             if (data.new_achievements && data.new_achievements.length > 0) {
               data.new_achievements.forEach((id) => {
                 const ach = ACHIEVEMENTS[id];
-                showNotification(`Achievement Unlocked: ${ach.name}`, ach.description, ach.icon);
+                if (ach) {
+                  showNotification(`Achievement Unlocked: ${ach.name}`, ach.description, ach.icon);
+                } else {
+                  console.warn(`Unknown achievement ID received from server: ${id}`);
+                }
               });
               updateAchievementDisplay();
             }
@@ -866,7 +1061,8 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         })
         .catch((error) => {
-          setFeedback("Error submitting answer.");
+          console.error("Submit error details:", error);
+          setFeedback("Error submitting answer. Check console for details.");
           document.getElementById("submit-btn").disabled = false;
         });
     });
@@ -879,7 +1075,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .then(data => {
         const leaderboard = document.querySelector('.sidebar ol');
         if (leaderboard) {
-          leaderboard.innerHTML = data.map((entry, i) =>
+          leaderboard.innerHTML = data.slice(0, 10).map((entry, i) =>
             `<li>${entry.name} - ${entry.score} <span style='color:#78909c'>(${entry.mode} mode)</span></li>`
           ).join('');
         }
@@ -887,6 +1083,284 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   // Update leaderboard on load
   updateLeaderboard();
+
+  // --- Shop System ---
+  let currentBytes = 0;
+  let currentPowerUps = { time_freeze: 0, debugger: 0, skip: 0 };
+
+  function updateShopUI() {
+    // Update bytes display
+    document.getElementById('bytes-count').textContent = currentBytes;
+    document.getElementById('shop-bytes').textContent = currentBytes;
+
+    // Update owned counts in shop
+    document.querySelectorAll('.power-up-card').forEach(card => {
+      const powerup = card.dataset.powerup;
+      const count = currentPowerUps[powerup] || 0;
+      card.querySelector('.owned-count').textContent = count;
+    });
+
+    // Update power-up buttons
+    document.getElementById('use-time-freeze').querySelector('.count').textContent = currentPowerUps.time_freeze || 0;
+    document.getElementById('use-debugger').querySelector('.count').textContent = currentPowerUps.debugger || 0;
+    document.getElementById('use-skip').querySelector('.count').textContent = currentPowerUps.skip || 0;
+
+    // Enable/disable buttons
+    document.getElementById('use-time-freeze').disabled = (currentPowerUps.time_freeze || 0) === 0;
+    document.getElementById('use-debugger').disabled = (currentPowerUps.debugger || 0) === 0;
+    document.getElementById('use-skip').disabled = (currentPowerUps.skip || 0) === 0;
+  }
+
+  function fetchShopStatus() {
+    fetch('/api/shop/status')
+      .then(res => res.json())
+      .then(data => {
+        currentBytes = data.bytes;
+        currentPowerUps = data.power_ups;
+        updateShopUI();
+      });
+  }
+
+  // Shop modal handlers
+  const shopBtn = document.getElementById('shop-btn');
+  const shopModal = document.getElementById('shop-modal');
+  const closeShopModal = document.getElementById('close-shop-modal');
+
+  if (shopBtn) {
+    shopBtn.addEventListener('click', () => {
+      fetchShopStatus();
+      shopModal.style.display = 'flex';
+    });
+  }
+
+  if (closeShopModal) {
+    closeShopModal.addEventListener('click', () => {
+      shopModal.style.display = 'none';
+    });
+  }
+
+  // Purchase handlers
+  document.querySelectorAll('.buy-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+      const powerup = this.dataset.powerup;
+      this.disabled = true;
+
+      fetch('/api/shop/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ power_up: powerup })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            alert(data.error);
+          } else {
+            currentBytes = data.bytes;
+            currentPowerUps = data.power_ups;
+            updateShopUI();
+            playSound('correct');
+          }
+          this.disabled = false;
+        })
+        .catch(err => {
+          console.error('Purchase error:', err);
+          this.disabled = false;
+        });
+    });
+  });
+
+  // Power-up activation handlers
+  document.getElementById('use-time-freeze').addEventListener('click', function () {
+    if (currentPowerUps.time_freeze > 0) {
+      // Add 10 seconds to timer
+      const countdown = document.getElementById('timer-countdown');
+      const currentTime = parseInt(countdown.textContent);
+      countdown.textContent = currentTime + 10;
+
+      currentPowerUps.time_freeze--;
+      updateShopUI();
+      playSound('achievement');
+      setFeedback('⏱️ +10 seconds added!');
+    }
+  });
+
+  document.getElementById('use-debugger').addEventListener('click', function () {
+    if (currentPowerUps.debugger > 0) {
+      // Reveal one digit of the answer
+      fetch('/api/last_answer')
+        .then(res => res.json())
+        .then(data => {
+          if (data.last_answer !== null) {
+            const answer = String(data.last_answer);
+            const digit = answer[Math.floor(Math.random() * answer.length)];
+            setFeedback(`🔍 Hint: The answer contains the digit "${digit}"`);
+            playSound('achievement');
+          }
+        });
+
+      currentPowerUps.debugger--;
+      updateShopUI();
+    }
+  });
+
+  document.getElementById('use-skip').addEventListener('click', function () {
+    if (currentPowerUps.skip > 0) {
+      currentPowerUps.skip--;
+      updateShopUI();
+      playSound('achievement');
+      setFeedback('⏭️ Skipping level...');
+      stopTimer();
+      setTimeout(() => {
+        loadChallenge();
+      }, 800);
+    }
+  });
+
+  // Fetch shop status on load
+  fetchShopStatus();
+
+  // --- Boss Battle System ---
+  let bossSequences = [];
+  let bossCurrentIndex = 0;
+  let bossTimerInterval = null;
+
+  function startBossBattle(level) {
+    console.log("Starting boss battle for level", level);
+
+    // Show boss overlay
+    const bossOverlay = document.getElementById('boss-overlay');
+    document.getElementById('boss-level-num').textContent = level;
+    bossOverlay.style.display = 'flex';
+
+    // Fetch boss sequences
+    fetch('/api/boss/start', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        bossSequences = data.sequences;
+        bossCurrentIndex = 0;
+
+        // Start boss timer (30 seconds total)
+        startBossTimer(30);
+
+        // Load first sequence
+        loadBossSequence(0);
+
+        playSound('warning');
+      })
+      .catch(err => {
+        console.error('Boss start error:', err);
+        bossOverlay.style.display = 'none';
+      });
+  }
+
+  function startBossTimer(seconds) {
+    let timeLeft = seconds;
+    const timerBar = document.getElementById('boss-timer-bar');
+    const timerText = document.getElementById('boss-timer-text');
+
+    timerBar.style.width = '100%';
+    timerText.textContent = timeLeft;
+
+    if (bossTimerInterval) clearInterval(bossTimerInterval);
+
+    bossTimerInterval = setInterval(() => {
+      timeLeft--;
+      const percentage = (timeLeft / seconds) * 100;
+      timerBar.style.width = percentage + '%';
+      timerText.textContent = timeLeft;
+
+      if (timeLeft <= 5) {
+        playSound('warning');
+      }
+
+      if (timeLeft <= 0) {
+        clearInterval(bossTimerInterval);
+        bossFailed('⏰ Time\'s up! Boss Battle Failed!');
+      }
+    }, 1000);
+  }
+
+  function loadBossSequence(index) {
+    if (index >= bossSequences.length) return;
+
+    const seq = bossSequences[index];
+    document.getElementById('boss-sequence').textContent = seq.sequence.join(' ');
+    document.getElementById('boss-hint').textContent = seq.hint;
+    document.getElementById('boss-progress-text').textContent = `${index}/3`;
+    document.getElementById('boss-feedback').textContent = '';
+    document.getElementById('boss-answer-input').value = '';
+    document.getElementById('boss-answer-input').focus();
+  }
+
+  function bossFailed(message) {
+    clearInterval(bossTimerInterval);
+    document.getElementById('boss-feedback').textContent = message;
+    document.getElementById('boss-submit-btn').disabled = true;
+    playSound('wrong');
+
+    setTimeout(() => {
+      document.getElementById('boss-overlay').style.display = 'none';
+      const finalScore = parseInt(document.getElementById('level-score').textContent.match(/Score: (\d+)/)?.[1] || 0);
+      disableGame(finalScore);
+    }, 2000);
+  }
+
+  function bossVictory() {
+    clearInterval(bossTimerInterval);
+    document.getElementById('boss-feedback').innerHTML = '🎉 <span class="boss-victory">BOSS DEFEATED!</span> 🎉';
+    document.getElementById('boss-submit-btn').disabled = true;
+    playSound('achievement');
+    confetti();
+
+    setTimeout(() => {
+      document.getElementById('boss-overlay').style.display = 'none';
+      fetchShopStatus(); // Update bytes
+      loadChallenge(); // Load next level
+    }, 2500);
+  }
+
+  // Boss answer form handler
+  const bossAnswerForm = document.getElementById('boss-answer-form');
+  console.log('Boss answer form:', bossAnswerForm);
+  if (bossAnswerForm) {
+    bossAnswerForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      console.log('Boss form submitted!');
+
+      const answer = document.getElementById('boss-answer-input').value.trim();
+      if (!answer) return;
+
+      document.getElementById('boss-submit-btn').disabled = true;
+
+      fetch('/api/boss/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.boss_defeated) {
+            bossVictory();
+          } else if (data.correct) {
+            // Correct, move to next sequence
+            document.getElementById('boss-feedback').textContent = data.message;
+            playSound('correct');
+            bossCurrentIndex++;
+            setTimeout(() => {
+              loadBossSequence(bossCurrentIndex);
+              document.getElementById('boss-submit-btn').disabled = false;
+            }, 800);
+          } else {
+            // Wrong answer - boss battle failed
+            bossFailed(data.message);
+          }
+        })
+        .catch(err => {
+          console.error('Boss answer error:', err);
+          document.getElementById('boss-submit-btn').disabled = false;
+        });
+    });
+  }
 
   // --- Battle Mode UI Logic ---
   const battleBtn = document.getElementById("battle-btn");
@@ -982,14 +1456,14 @@ document.addEventListener("DOMContentLoaded", () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: selectedMode })
     })
-    .then(response => response.json())
-    .then(data => {
-      if (data.status === 'success') {
-        loadChallenge();
-        showScoreHistory();
-        updateStatsDisplay();
-      }
-    });
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'success') {
+          loadChallenge();
+          showScoreHistory();
+          updateStatsDisplay();
+        }
+      });
     // TODO: For real multiplayer, sync state with server; for AI, simulate AI moves.
   }
 
@@ -1060,12 +1534,12 @@ document.addEventListener("DOMContentLoaded", () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: selectedMode })
     })
-    .then(response => response.json())
-    .then(data => {
-      if (data.status === 'success') {
-        nextBattleRound();
-      }
-    });
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'success') {
+          nextBattleRound();
+        }
+      });
   }
 
   function nextBattleRound() {
@@ -1115,48 +1589,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }, delay);
   }
 
-  // Patch answer form submit for battle mode
-  if (answerFormEl) {
-    const origSubmit = answerFormEl.onsubmit;
-    answerFormEl.addEventListener('submit', function (event) {
-      if (!isBattleMode) return;
-      event.preventDefault();
-      const answerInput = document.getElementById('answer-input');
-      const answer = answerInput.value.trim();
-      if (!answer) return;
-      document.getElementById('submit-btn').disabled = true;
-      fetch('/api/answer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answer })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.game_over) {
-          setFeedback(data.message);
-          playSound('wrong');
-          document.getElementById('game-card').classList.add('shake');
-          // In battle mode, just go to next round
-          setTimeout(() => {
-            nextBattleRound();
-          }, 1200);
-        } else {
-          setFeedback(data.message);
-          playSound('correct');
-          confetti();
-          document.getElementById('game-card').classList.add('glow');
-          setTimeout(() => document.getElementById('game-card').classList.remove('glow'), 800);
-          // Add to player score
-          battlePlayerScore += 100 + Math.floor(Math.random() * 100);
-          setTimeout(() => {
-            nextBattleRound();
-          }, 1200);
-        }
-      })
-      .catch(error => {
-        setFeedback('Error submitting answer.');
-        document.getElementById('submit-btn').disabled = false;
-      });
-    });
-  }
+  // Patch answer form submit for battle mode - MERGED into main handler
+  // The logic is now handled in the main submit handler above by checking isBattleMode
+
 });
