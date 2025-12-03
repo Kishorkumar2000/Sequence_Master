@@ -7,8 +7,8 @@ import os
 import hashlib
 
 app = Flask(__name__)
-# Use a constant secret key for development to persist sessions across restarts
-app.secret_key = 'dev-secret-key-sequence-master'
+# Use environment variable in production, fallback to dev key for local development
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-sequence-master')
 
 # Load configuration
 def load_config():
